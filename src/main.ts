@@ -32,6 +32,18 @@ function createShell() {
           <div class="intro-art" role="img" aria-label="Mumu Brothers intro artwork"></div>
           <button id="start-game" class="start-game" type="button">START</button>
         </div>
+        <div class="touch-controls" aria-label="Touch controls">
+          <div class="touch-pad" aria-label="Move">
+            <button class="touch-btn touch-up" data-move="up" type="button" aria-label="Move up">▲</button>
+            <button class="touch-btn touch-left" data-move="left" type="button" aria-label="Move left">◀</button>
+            <button class="touch-btn touch-right" data-move="right" type="button" aria-label="Move right">▶</button>
+            <button class="touch-btn touch-down" data-move="down" type="button" aria-label="Move down">▼</button>
+          </div>
+          <div class="touch-actions" aria-label="Actions">
+            <button id="touch-fire" class="touch-action fire" type="button">FIRE</button>
+            <button id="touch-dynamite" class="touch-action dynamite" type="button">BOMB</button>
+          </div>
+        </div>
       </section>
       <aside class="panel">
         <h1>Mumu Brothers</h1>
@@ -183,6 +195,9 @@ class MumuBrothersScene extends Phaser.Scene {
   private gatlingAmmo = 0;
   private dynamite = 0;
   private isPointerDown = false;
+  private isTouchFireDown = false;
+  private touchMove = { x: 0, y: 0 };
+  private activeTouchMoves = new Set<string>();
   private nextPlayerShot = 0;
   private nextEnemyShot = 0;
   private nextSpawn = 0;
@@ -198,6 +213,8 @@ class MumuBrothersScene extends Phaser.Scene {
   private shopGoldText!: HTMLElement;
   private introOverlay!: HTMLElement;
   private startButton!: HTMLButtonElement;
+  private touchFireButton!: HTMLButtonElement;
+  private touchDynamiteButton!: HTMLButtonElement;
   private buyShotgunButton!: HTMLButtonElement;
   private buyRifleButton!: HTMLButtonElement;
   private buyGatlingButton!: HTMLButtonElement;
@@ -266,7 +283,7 @@ class MumuBrothersScene extends Phaser.Scene {
     ) {
       this.shoot();
     }
-    if (this.weapon === "gatling" && this.isPointerDown) this.shoot();
+    if (this.weapon === "gatling" && (this.isPointerDown || this.isTouchFireDown)) this.shoot();
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.throwDynamite();
 
     const activeCap = this.bossSpawned ? 8 : Math.min(16 + this.wave * 3, 32);
@@ -293,6 +310,8 @@ class MumuBrothersScene extends Phaser.Scene {
     this.shopGoldText = document.querySelector("#shop-gold")!;
     this.introOverlay = document.querySelector("#intro")!;
     this.startButton = document.querySelector("#start-game")!;
+    this.touchFireButton = document.querySelector("#touch-fire")!;
+    this.touchDynamiteButton = document.querySelector("#touch-dynamite")!;
     this.buyShotgunButton = document.querySelector("#buy-shotgun")!;
     this.buyRifleButton = document.querySelector("#buy-rifle")!;
     this.buyGatlingButton = document.querySelector("#buy-gatling")!;
@@ -306,6 +325,51 @@ class MumuBrothersScene extends Phaser.Scene {
     this.buyDynamiteButton.addEventListener("click", () => this.buyShopItem("dynamite"));
     this.continueButton.addEventListener("click", () => this.leaveShop());
     this.startButton.addEventListener("click", () => this.startGame());
+    this.bindTouchControls();
+  }
+
+  private bindTouchControls() {
+    const stopTouch = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    document.querySelectorAll<HTMLButtonElement>("[data-move]").forEach((button) => {
+      const direction = button.dataset.move!;
+      button.addEventListener("pointerdown", (event) => {
+        stopTouch(event);
+        this.activeTouchMoves.add(direction);
+        this.updateTouchMove();
+      });
+      const release = (event: Event) => {
+        stopTouch(event);
+        this.activeTouchMoves.delete(direction);
+        this.updateTouchMove();
+      };
+      button.addEventListener("pointerup", release);
+      button.addEventListener("pointercancel", release);
+      button.addEventListener("pointerleave", release);
+    });
+    this.touchFireButton.addEventListener("pointerdown", (event) => {
+      stopTouch(event);
+      this.isTouchFireDown = true;
+      this.shoot();
+    });
+    const stopFire = (event: Event) => {
+      stopTouch(event);
+      this.isTouchFireDown = false;
+    };
+    this.touchFireButton.addEventListener("pointerup", stopFire);
+    this.touchFireButton.addEventListener("pointercancel", stopFire);
+    this.touchFireButton.addEventListener("pointerleave", stopFire);
+    this.touchDynamiteButton.addEventListener("pointerdown", (event) => {
+      stopTouch(event);
+      this.throwDynamite();
+    });
+  }
+
+  private updateTouchMove() {
+    this.touchMove.x = Number(this.activeTouchMoves.has("right")) - Number(this.activeTouchMoves.has("left"));
+    this.touchMove.y = Number(this.activeTouchMoves.has("down")) - Number(this.activeTouchMoves.has("up"));
   }
 
   private startGame() {
@@ -575,10 +639,10 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private handleInput(delta: number) {
-    const left = this.cursors.left.isDown || this.keys.A.isDown;
-    const right = this.cursors.right.isDown || this.keys.D.isDown;
-    const up = this.cursors.up.isDown || this.keys.W.isDown;
-    const down = this.cursors.down.isDown || this.keys.S.isDown;
+    const left = this.cursors.left.isDown || this.keys.A.isDown || this.touchMove.x < 0;
+    const right = this.cursors.right.isDown || this.keys.D.isDown || this.touchMove.x > 0;
+    const up = this.cursors.up.isDown || this.keys.W.isDown || this.touchMove.y < 0;
+    const down = this.cursors.down.isDown || this.keys.S.isDown || this.touchMove.y > 0;
     const speed = 305 * (delta / 1000);
     let x = this.player.x;
     let y = this.player.y;
