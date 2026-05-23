@@ -84,6 +84,60 @@ body {
   display: none;
 }
 
+.intro {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: block;
+  overflow: hidden;
+  background: #100c0b;
+}
+
+.intro.hidden {
+  display: none;
+}
+
+.intro-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(rgba(16, 8, 6, 0.01), rgba(16, 8, 6, 0.1)),
+    url("/assets/mumu-intro.png") center / cover no-repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.start-game {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  z-index: 2;
+  min-width: 180px;
+  min-height: 54px;
+  transform: translateX(-50%);
+  border: 2px solid rgba(255, 232, 150, 0.84);
+  background: linear-gradient(180deg, #e44727, #9f2419);
+  box-shadow: 0 12px 0 #55150f, 0 22px 44px rgba(0, 0, 0, 0.45);
+  color: #fff4bd;
+  cursor: pointer;
+  font: inherit;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.start-game:hover {
+  filter: brightness(1.12);
+}
+
+.start-game:active {
+  bottom: 25px;
+  box-shadow: 0 7px 0 #55150f, 0 16px 34px rgba(0, 0, 0, 0.4);
+}
+
 .shop-window {
   width: min(640px, calc(100% - 36px));
   margin-top: 8px;

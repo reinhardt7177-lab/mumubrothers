@@ -28,6 +28,10 @@ function createShell() {
             <button id="continue-stage" class="continue" type="button">Next Stage</button>
           </div>
         </div>
+        <div id="intro" class="intro">
+          <div class="intro-art" role="img" aria-label="Mumu Brothers intro artwork"></div>
+          <button id="start-game" class="start-game" type="button">START</button>
+        </div>
       </section>
       <aside class="panel">
         <h1>Mumu Brothers</h1>
@@ -171,8 +175,9 @@ class MumuBrothersScene extends Phaser.Scene {
   private wave = 1;
   private combo = 0;
   private stageKills = 0;
-  private killTarget = 12;
+  private killTarget = 50;
   private bossSpawned = false;
+  private gameStarted = false;
   private inShop = false;
   private weapon: WeaponKind = "pistol";
   private gatlingAmmo = 0;
@@ -191,6 +196,8 @@ class MumuBrothersScene extends Phaser.Scene {
   private shopOverlay!: HTMLElement;
   private shopTitle!: HTMLElement;
   private shopGoldText!: HTMLElement;
+  private introOverlay!: HTMLElement;
+  private startButton!: HTMLButtonElement;
   private buyShotgunButton!: HTMLButtonElement;
   private buyRifleButton!: HTMLButtonElement;
   private buyGatlingButton!: HTMLButtonElement;
@@ -227,6 +234,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.keys = this.input.keyboard!.addKeys("W,A,S,D,Z,X,C,F,SPACE,ENTER,R") as Record<string, Phaser.Input.Keyboard.Key>;
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => this.reticle.setPosition(pointer.x, pointer.y));
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (!this.gameStarted) return;
       this.isPointerDown = true;
       this.reticle.setPosition(pointer.x, pointer.y);
       this.shoot();
@@ -234,15 +242,14 @@ class MumuBrothersScene extends Phaser.Scene {
     this.input.on("pointerup", () => {
       this.isPointerDown = false;
     });
-    this.spawnWave();
-    this.updateHud(this.stageTitle());
-    if (new URLSearchParams(window.location.search).get("shop") === "1") {
-      this.gold = Math.max(this.gold, 30);
-      this.openShop();
-    }
+    this.updateHud();
   }
 
   update(time: number, delta: number) {
+    if (!this.gameStarted) {
+      if (Phaser.Input.Keyboard.JustDown(this.keys.ENTER) || Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.startGame();
+      return;
+    }
     if (this.inShop) return;
 
     if (this.isGameOver) {
@@ -284,6 +291,8 @@ class MumuBrothersScene extends Phaser.Scene {
     this.shopOverlay = document.querySelector("#shop")!;
     this.shopTitle = document.querySelector("#shop-title")!;
     this.shopGoldText = document.querySelector("#shop-gold")!;
+    this.introOverlay = document.querySelector("#intro")!;
+    this.startButton = document.querySelector("#start-game")!;
     this.buyShotgunButton = document.querySelector("#buy-shotgun")!;
     this.buyRifleButton = document.querySelector("#buy-rifle")!;
     this.buyGatlingButton = document.querySelector("#buy-gatling")!;
@@ -296,6 +305,19 @@ class MumuBrothersScene extends Phaser.Scene {
     this.buyPotionButton.addEventListener("click", () => this.buyShopItem("potion"));
     this.buyDynamiteButton.addEventListener("click", () => this.buyShopItem("dynamite"));
     this.continueButton.addEventListener("click", () => this.leaveShop());
+    this.startButton.addEventListener("click", () => this.startGame());
+  }
+
+  private startGame() {
+    if (this.gameStarted) return;
+    this.gameStarted = true;
+    this.introOverlay.classList.add("hidden");
+    this.spawnWave();
+    this.updateHud(this.stageTitle());
+    if (new URLSearchParams(window.location.search).get("shop") === "1") {
+      this.gold = Math.max(this.gold, 30);
+      this.openShop();
+    }
   }
 
   private applyStartParams() {
