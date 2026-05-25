@@ -361,8 +361,8 @@ body {
 
 .touch-actions {
   display: grid;
-  grid-template-columns: 92px 72px;
-  gap: 10px;
+  grid-template-columns: 76px;
+  gap: 0;
   align-items: end;
 }
 
@@ -373,15 +373,9 @@ body {
   letter-spacing: 0;
 }
 
-.touch-action.fire {
-  min-height: 92px;
-  background: linear-gradient(180deg, rgba(229, 69, 38, 0.82), rgba(126, 30, 20, 0.82));
-  font-size: 18px;
-}
-
 .touch-action.dynamite {
   align-self: center;
-  background: rgba(86, 48, 28, 0.72);
+  background: linear-gradient(180deg, rgba(122, 66, 32, 0.82), rgba(72, 36, 22, 0.82));
   color: #ffd36e;
   font-size: 13px;
 }
@@ -488,8 +482,94 @@ body {
 }
 
 @media (pointer: coarse) {
+  .shell {
+    grid-template-columns: 1fr;
+    height: 100vh;
+    padding: 8px;
+  }
+
+  .stage-wrap {
+    width: min(calc(100vw - 16px), calc((100vh - 16px) * 16 / 9));
+  }
+
+  .panel {
+    display: none;
+  }
+
   .touch-controls {
     display: flex;
+  }
+}
+
+@media (pointer: coarse) and (orientation: portrait) {
+  body {
+    overflow: auto;
+  }
+
+  .shell {
+    height: auto;
+    min-height: 100vh;
+    align-content: start;
+  }
+
+  .stage-wrap {
+    width: calc(100vw - 16px);
+    margin-top: 8px;
+  }
+
+  .hud {
+    top: 7px;
+    left: 7px;
+    right: 7px;
+    gap: 4px;
+  }
+
+  .hud div {
+    padding: 4px 5px;
+  }
+
+  .hud span {
+    font-size: 8px;
+  }
+
+  .hud strong {
+    font-size: 14px;
+  }
+
+  .touch-controls {
+    left: 8px;
+    right: 8px;
+    bottom: 7px;
+  }
+
+  .touch-pad {
+    width: 112px;
+    height: 112px;
+  }
+
+  .touch-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .touch-up,
+  .touch-down {
+    left: 36px;
+  }
+
+  .touch-left,
+  .touch-right {
+    top: 36px;
+  }
+
+  .touch-actions {
+    grid-template-columns: 58px;
+  }
+
+  .touch-action.dynamite {
+    min-height: 54px;
+    font-size: 11px;
   }
 }
 
@@ -565,12 +645,7 @@ body {
   }
 
   .touch-actions {
-    grid-template-columns: 78px 60px;
-    gap: 7px;
-  }
-
-  .touch-action.fire {
-    min-height: 78px;
+    grid-template-columns: 62px;
   }
 
   .touch-action.dynamite {

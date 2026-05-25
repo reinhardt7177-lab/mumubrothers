@@ -34,13 +34,12 @@ function createShell() {
         </div>
         <div class="touch-controls" aria-label="Touch controls">
           <div class="touch-pad" aria-label="Move">
-            <button class="touch-btn touch-up" data-move="up" type="button" aria-label="Move up">▲</button>
-            <button class="touch-btn touch-left" data-move="left" type="button" aria-label="Move left">◀</button>
-            <button class="touch-btn touch-right" data-move="right" type="button" aria-label="Move right">▶</button>
-            <button class="touch-btn touch-down" data-move="down" type="button" aria-label="Move down">▼</button>
+            <button class="touch-btn touch-up" data-move="up" type="button" aria-label="Move up">U</button>
+            <button class="touch-btn touch-left" data-move="left" type="button" aria-label="Move left">L</button>
+            <button class="touch-btn touch-right" data-move="right" type="button" aria-label="Move right">R</button>
+            <button class="touch-btn touch-down" data-move="down" type="button" aria-label="Move down">D</button>
           </div>
           <div class="touch-actions" aria-label="Actions">
-            <button id="touch-fire" class="touch-action fire" type="button">FIRE</button>
             <button id="touch-dynamite" class="touch-action dynamite" type="button">BOMB</button>
           </div>
         </div>
@@ -51,7 +50,7 @@ function createShell() {
         <div class="controls">
           <span>A/D or arrows</span><b>move</b>
           <span>Mouse</span><b>aim</b>
-          <span>Click or Z/X/C/Space</span><b>fire</b>
+          <span>Tap target or Z/X/C/Space</span><b>fire</b>
           <span>F</span><b>dynamite</b>
           <span>R</span><b>restart</b>
         </div>
@@ -195,7 +194,6 @@ class MumuBrothersScene extends Phaser.Scene {
   private gatlingAmmo = 0;
   private dynamite = 0;
   private isPointerDown = false;
-  private isTouchFireDown = false;
   private touchMove = { x: 0, y: 0 };
   private activeTouchMoves = new Set<string>();
   private nextPlayerShot = 0;
@@ -213,7 +211,6 @@ class MumuBrothersScene extends Phaser.Scene {
   private shopGoldText!: HTMLElement;
   private introOverlay!: HTMLElement;
   private startButton!: HTMLButtonElement;
-  private touchFireButton!: HTMLButtonElement;
   private touchDynamiteButton!: HTMLButtonElement;
   private buyShotgunButton!: HTMLButtonElement;
   private buyRifleButton!: HTMLButtonElement;
@@ -283,7 +280,7 @@ class MumuBrothersScene extends Phaser.Scene {
     ) {
       this.shoot();
     }
-    if (this.weapon === "gatling" && (this.isPointerDown || this.isTouchFireDown)) this.shoot();
+    if (this.weapon === "gatling" && this.isPointerDown) this.shoot();
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.throwDynamite();
 
     const activeCap = this.bossSpawned ? 8 : Math.min(16 + this.wave * 3, 32);
@@ -310,7 +307,6 @@ class MumuBrothersScene extends Phaser.Scene {
     this.shopGoldText = document.querySelector("#shop-gold")!;
     this.introOverlay = document.querySelector("#intro")!;
     this.startButton = document.querySelector("#start-game")!;
-    this.touchFireButton = document.querySelector("#touch-fire")!;
     this.touchDynamiteButton = document.querySelector("#touch-dynamite")!;
     this.buyShotgunButton = document.querySelector("#buy-shotgun")!;
     this.buyRifleButton = document.querySelector("#buy-rifle")!;
@@ -349,18 +345,6 @@ class MumuBrothersScene extends Phaser.Scene {
       button.addEventListener("pointercancel", release);
       button.addEventListener("pointerleave", release);
     });
-    this.touchFireButton.addEventListener("pointerdown", (event) => {
-      stopTouch(event);
-      this.isTouchFireDown = true;
-      this.shoot();
-    });
-    const stopFire = (event: Event) => {
-      stopTouch(event);
-      this.isTouchFireDown = false;
-    };
-    this.touchFireButton.addEventListener("pointerup", stopFire);
-    this.touchFireButton.addEventListener("pointercancel", stopFire);
-    this.touchFireButton.addEventListener("pointerleave", stopFire);
     this.touchDynamiteButton.addEventListener("pointerdown", (event) => {
       stopTouch(event);
       this.throwDynamite();
