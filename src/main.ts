@@ -311,7 +311,7 @@ class MumuBrothersScene extends Phaser.Scene {
     ) {
       this.shoot();
     }
-    if (this.weapon === "gatling" && this.isPointerDown) this.shoot();
+    if (this.isPointerDown) this.shoot();
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.throwDynamite();
 
     const activeCap = this.bossSpawned ? 8 : Math.min(16 + this.wave * 3, 32);
