@@ -19,9 +19,11 @@ function createShell() {
             <h2 id="shop-title">SHOP</h2>
             <p id="shop-gold">Gold 0</p>
             <div class="shop-grid">
-              <button id="buy-shotgun" type="button"><i class="item-icon shotgun"></i><span>Double Barrel</span><small>Wide x2 / Damage x2 / Slower</small></button>
-              <button id="buy-rifle" type="button"><i class="item-icon rifle"></i><span>Long Rifle</span><small>Damage x3 / Precise</small></button>
-              <button id="buy-gatling" type="button"><i class="item-icon gatling"></i><span>Gatling</span><small>1000 rounds / then pistol</small></button>
+              <button id="buy-damage" type="button"><i class="item-icon shotgun"></i><span>Powder</span><small>Damage up</small></button>
+              <button id="buy-range" type="button"><i class="item-icon rifle"></i><span>Barrel</span><small>Range up</small></button>
+              <button id="buy-reload" type="button"><i class="item-icon gatling"></i><span>Trigger</span><small>Reload up</small></button>
+              <button id="buy-pierce" type="button"><i class="item-icon rifle"></i><span>Piercer</span><small>Pierce up</small></button>
+              <button id="buy-life" type="button"><i class="item-icon potion"></i><span>Iron Heart</span><small>Max life up</small></button>
               <button id="buy-potion" type="button"><i class="item-icon potion"></i><span>Healing Potion</span><small>Restore 2 hearts</small></button>
               <button id="buy-dynamite" type="button"><i class="item-icon dynamite"></i><span>Dynamite</span><small>Clear screen / Max 3</small></button>
             </div>
@@ -192,6 +194,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private score = 0;
   private gold = 0;
   private lives = 5;
+  private maxLives = 5;
   private wave = 1;
   private combo = 0;
   private stageKills = 0;
@@ -202,6 +205,11 @@ class MumuBrothersScene extends Phaser.Scene {
   private weapon: WeaponKind = "pistol";
   private gatlingAmmo = 0;
   private dynamite = 0;
+  private gunDamageLevel = 0;
+  private gunRangeLevel = 0;
+  private gunReloadLevel = 0;
+  private gunPierceLevel = 0;
+  private maxLifeLevel = 0;
   private isPointerDown = false;
   private touchMove = { x: 0, y: 0 };
   private activeTouchMoves = new Set<string>();
@@ -222,9 +230,11 @@ class MumuBrothersScene extends Phaser.Scene {
   private introOverlay!: HTMLElement;
   private startButton!: HTMLButtonElement;
   private touchDynamiteButton!: HTMLButtonElement;
-  private buyShotgunButton!: HTMLButtonElement;
-  private buyRifleButton!: HTMLButtonElement;
-  private buyGatlingButton!: HTMLButtonElement;
+  private buyDamageButton!: HTMLButtonElement;
+  private buyRangeButton!: HTMLButtonElement;
+  private buyReloadButton!: HTMLButtonElement;
+  private buyPierceButton!: HTMLButtonElement;
+  private buyLifeButton!: HTMLButtonElement;
   private buyPotionButton!: HTMLButtonElement;
   private buyDynamiteButton!: HTMLButtonElement;
   private continueButton!: HTMLButtonElement;
@@ -329,15 +339,19 @@ class MumuBrothersScene extends Phaser.Scene {
     this.introOverlay = document.querySelector("#intro")!;
     this.startButton = document.querySelector("#start-game")!;
     this.touchDynamiteButton = document.querySelector("#touch-dynamite")!;
-    this.buyShotgunButton = document.querySelector("#buy-shotgun")!;
-    this.buyRifleButton = document.querySelector("#buy-rifle")!;
-    this.buyGatlingButton = document.querySelector("#buy-gatling")!;
+    this.buyDamageButton = document.querySelector("#buy-damage")!;
+    this.buyRangeButton = document.querySelector("#buy-range")!;
+    this.buyReloadButton = document.querySelector("#buy-reload")!;
+    this.buyPierceButton = document.querySelector("#buy-pierce")!;
+    this.buyLifeButton = document.querySelector("#buy-life")!;
     this.buyPotionButton = document.querySelector("#buy-potion")!;
     this.buyDynamiteButton = document.querySelector("#buy-dynamite")!;
     this.continueButton = document.querySelector("#continue-stage")!;
-    this.buyShotgunButton.addEventListener("click", () => this.buyShopItem("shotgun"));
-    this.buyRifleButton.addEventListener("click", () => this.buyShopItem("rifle"));
-    this.buyGatlingButton.addEventListener("click", () => this.buyShopItem("gatling"));
+    this.buyDamageButton.addEventListener("click", () => this.buyShopItem("damage"));
+    this.buyRangeButton.addEventListener("click", () => this.buyShopItem("range"));
+    this.buyReloadButton.addEventListener("click", () => this.buyShopItem("reload"));
+    this.buyPierceButton.addEventListener("click", () => this.buyShopItem("pierce"));
+    this.buyLifeButton.addEventListener("click", () => this.buyShopItem("life"));
     this.buyPotionButton.addEventListener("click", () => this.buyShopItem("potion"));
     this.buyDynamiteButton.addEventListener("click", () => this.buyShopItem("dynamite"));
     this.continueButton.addEventListener("click", () => this.leaveShop());
@@ -576,13 +590,13 @@ class MumuBrothersScene extends Phaser.Scene {
     const enemyFrame = this.pickEnemyFrame(isBoss);
     const bossFrame = this.currentTheme().bossSprite;
     const bossMeta = BOSS_SPRITES[bossFrame];
-    const bossHeight = 320;
+    const bossHeight = 213;
     const bossWidth = Math.round((bossMeta.w / bossMeta.h) * bossHeight);
     const sprite = isBoss
-      ? this.bossSprite(0, -86, bossFrame, bossWidth, bossHeight)
+      ? this.bossSprite(0, -58, bossFrame, bossWidth, bossHeight)
       : this.enemySprite(0, -24, enemyFrame, 100, 108);
     c.add([shadow, sprite]);
-    const body = this.add.rectangle(point.x, point.y, isBoss ? 130 : 52, isBoss ? 190 : 88, 0xffffff, 0).setDepth(4);
+    const body = this.add.rectangle(point.x, point.y, isBoss ? 90 : 52, isBoss ? 130 : 88, 0xffffff, 0).setDepth(4);
     this.tweens.add({
       targets: c,
       y: point.y,
@@ -623,7 +637,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.invulnerableUntil = this.time.now + 2200;
     if (new URLSearchParams(window.location.search).has("stage")) {
       this.invulnerableUntil = this.time.now + 8000;
-      this.lives = Math.max(this.lives, 5);
+      this.lives = Math.max(this.lives, this.maxLives);
     }
     this.stageKills = 0;
     this.bossSpawned = false;
@@ -689,10 +703,10 @@ class MumuBrothersScene extends Phaser.Scene {
     this.cameras.main.shake(weapon.shake, 0.0025);
     this.flash(start.x + direction.x * 34, start.y + direction.y * 34, 0xfff0a8);
     this.impactAt(this.reticle.x, this.reticle.y);
-    this.hitScanAt(this.reticle.x, this.reticle.y, weapon.damage, weapon.radius);
+    this.hitScanAt(this.reticle.x, this.reticle.y, weapon.damage, weapon.radius, weapon.pierce);
     if (weapon.extraHits > 0) {
-      this.hitScanAt(this.reticle.x - weapon.radius * 0.9, this.reticle.y, weapon.damage, weapon.radius);
-      this.hitScanAt(this.reticle.x + weapon.radius * 0.9, this.reticle.y, weapon.damage, weapon.radius);
+      this.hitScanAt(this.reticle.x - weapon.radius * 0.9, this.reticle.y, weapon.damage, weapon.radius, weapon.pierce);
+      this.hitScanAt(this.reticle.x + weapon.radius * 0.9, this.reticle.y, weapon.damage, weapon.radius, weapon.pierce);
     }
   }
 
@@ -781,7 +795,7 @@ class MumuBrothersScene extends Phaser.Scene {
     return false;
   }
 
-  private hitScanAt(x: number, y: number, damage: number, radius: number) {
+  private hitScanAt(x: number, y: number, damage: number, radius: number, pierce = 0) {
     const shotLine = new Phaser.Geom.Line(this.player.x, this.player.y - 18, x, y);
     const blocker = this.firstPropOnLine(shotLine);
     if (blocker) {
@@ -791,9 +805,13 @@ class MumuBrothersScene extends Phaser.Scene {
 
     const hitArea = new Phaser.Geom.Rectangle(x - radius, y - radius, radius * 2, radius * 2);
 
-    for (const enemy of this.enemies) {
-      if (!enemy.alive || !Phaser.Geom.Intersects.RectangleToRectangle(hitArea, enemy.body.getBounds())) continue;
-      this.damageEnemy(enemy, damage);
+    const targets = this.enemies
+      .filter((enemy) => enemy.alive && Phaser.Geom.Intersects.RectangleToRectangle(hitArea, enemy.body.getBounds()))
+      .sort((a, b) => Phaser.Math.Distance.Between(x, y, a.sprite.x, a.sprite.y) - Phaser.Math.Distance.Between(x, y, b.sprite.x, b.sprite.y));
+    if (targets.length > 0) {
+      for (const enemy of targets.slice(0, pierce + 1)) {
+        this.damageEnemy(enemy, damage);
+      }
       return;
     }
 
@@ -889,7 +907,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private openShop() {
     this.inShop = true;
     this.shopOverlay.classList.remove("hidden");
-    this.shopTitle.textContent = `SHOP - STAGE ${this.wave} CLEAR`;
+    this.shopTitle.textContent = `GUNSMITH - STAGE ${this.wave} CLEAR`;
     this.updateShop();
   }
 
@@ -903,9 +921,12 @@ class MumuBrothersScene extends Phaser.Scene {
     this.updateHud(this.stageTitle());
   }
 
-  private buyShopItem(kind: "shotgun" | "rifle" | "gatling" | "potion" | "dynamite") {
-    const costs = { shotgun: 8, rifle: 10, gatling: 14, potion: 4, dynamite: 6 };
-    const cost = costs[kind];
+  private buyShopItem(kind: "damage" | "range" | "reload" | "pierce" | "life" | "potion" | "dynamite") {
+    const cost = kind === "potion" ? 4 : kind === "dynamite" ? 6 : this.upgradeCost(kind);
+    if (kind !== "potion" && kind !== "dynamite" && this.upgradeLevel(kind) >= this.upgradeMax(kind)) {
+      this.updateHud("ALREADY MAXED");
+      return;
+    }
     if (kind === "dynamite" && this.dynamite >= 3) {
       this.updateHud("DYNAMITE FULL");
       return;
@@ -915,37 +936,81 @@ class MumuBrothersScene extends Phaser.Scene {
       return;
     }
     this.gold -= cost;
-    if (kind === "shotgun" || kind === "rifle") {
-      this.weapon = kind;
-      this.gatlingAmmo = 0;
-    } else if (kind === "gatling") {
-      this.weapon = "gatling";
-      this.gatlingAmmo = 1000;
+    if (kind === "damage") {
+      this.gunDamageLevel += 1;
+    } else if (kind === "range") {
+      this.gunRangeLevel += 1;
+    } else if (kind === "reload") {
+      this.gunReloadLevel += 1;
+    } else if (kind === "pierce") {
+      this.gunPierceLevel += 1;
+    } else if (kind === "life") {
+      this.maxLifeLevel += 1;
+      this.maxLives += 1;
+      this.lives = this.maxLives;
     } else if (kind === "potion") {
-      this.lives = Math.min(5, this.lives + 2);
+      this.lives = Math.min(this.maxLives, this.lives + 2);
     } else if (kind === "dynamite") {
       this.dynamite += 1;
     }
-    this.updateHud("SOLD");
+    this.updateHud(kind === "potion" || kind === "dynamite" ? "SOLD" : "GUN MODDED");
     this.updateShop();
   }
 
   private updateShop() {
-    const ammo = this.weapon === "gatling" ? ` | Gatling ${this.gatlingAmmo}` : "";
-    this.shopGoldText.textContent = `Gold ${this.gold} | Weapon ${this.weapon.toUpperCase()}${ammo} | Dynamite ${this.dynamite}/3`;
-    this.buyShotgunButton.innerHTML = `<i class="item-icon shotgun"></i><span>Double Barrel</span><small>8G | Wide x2, damage x2, 1.5x slower</small>`;
-    this.buyRifleButton.innerHTML = `<i class="item-icon rifle"></i><span>Long Rifle</span><small>10G | Damage x3, precise shot</small>`;
-    this.buyGatlingButton.innerHTML = `<i class="item-icon gatling"></i><span>Gatling</span><small>14G | 1000 rapid rounds, then pistol</small>`;
+    this.shopGoldText.textContent = `Gold ${this.gold} | Revolver DMG ${this.gunDamageLevel} RNG ${this.gunRangeLevel} REL ${this.gunReloadLevel} PRC ${this.gunPierceLevel} | Life ${this.lives}/${this.maxLives}`;
+    this.buyDamageButton.innerHTML = this.upgradeHtml("shotgun", "Powder", "damage", `Damage +1`);
+    this.buyRangeButton.innerHTML = this.upgradeHtml("rifle", "Long Barrel", "range", `Hit range +10`);
+    this.buyReloadButton.innerHTML = this.upgradeHtml("gatling", "Quick Trigger", "reload", `Reload -32ms`);
+    this.buyPierceButton.innerHTML = this.upgradeHtml("rifle", "Piercer", "pierce", `Hit +1 target`);
+    this.buyLifeButton.innerHTML = this.upgradeHtml("potion", "Iron Heart", "life", `Max life +1`);
     this.buyPotionButton.innerHTML = `<i class="item-icon potion"></i><span>Healing Potion</span><small>4G | Restore 2 hearts</small>`;
     this.buyDynamiteButton.innerHTML = `<i class="item-icon dynamite"></i><span>Dynamite</span><small>6G | Clear screen, max 3</small>`;
+    this.buyDamageButton.disabled = this.gunDamageLevel >= this.upgradeMax("damage");
+    this.buyRangeButton.disabled = this.gunRangeLevel >= this.upgradeMax("range");
+    this.buyReloadButton.disabled = this.gunReloadLevel >= this.upgradeMax("reload");
+    this.buyPierceButton.disabled = this.gunPierceLevel >= this.upgradeMax("pierce");
+    this.buyLifeButton.disabled = this.maxLifeLevel >= this.upgradeMax("life");
+    this.buyPotionButton.disabled = this.lives >= this.maxLives;
     this.buyDynamiteButton.disabled = this.dynamite >= 3;
   }
 
+  private upgradeLevel(kind: "damage" | "range" | "reload" | "pierce" | "life") {
+    if (kind === "damage") return this.gunDamageLevel;
+    if (kind === "range") return this.gunRangeLevel;
+    if (kind === "reload") return this.gunReloadLevel;
+    if (kind === "pierce") return this.gunPierceLevel;
+    return this.maxLifeLevel;
+  }
+
+  private upgradeMax(kind: "damage" | "range" | "reload" | "pierce" | "life") {
+    if (kind === "pierce") return 3;
+    if (kind === "life") return 4;
+    return 5;
+  }
+
+  private upgradeCost(kind: "damage" | "range" | "reload" | "pierce" | "life") {
+    const level = this.upgradeLevel(kind);
+    const base = { damage: 6, range: 5, reload: 7, pierce: 10, life: 8 }[kind];
+    return base + level * (kind === "pierce" ? 10 : kind === "life" ? 8 : 6);
+  }
+
+  private upgradeHtml(icon: string, label: string, kind: "damage" | "range" | "reload" | "pierce" | "life", detail: string) {
+    const level = this.upgradeLevel(kind);
+    const max = this.upgradeMax(kind);
+    const price = level >= max ? "MAX" : `${this.upgradeCost(kind)}G`;
+    return `<i class="item-icon ${icon}"></i><span>${label} ${level}/${max}</span><small>${price} | ${detail}</small>`;
+  }
+
   private weaponStats() {
-    if (this.weapon === "shotgun") return { damage: 2, radius: 56, delay: 315, extraHits: 1, shake: 70 };
-    if (this.weapon === "rifle") return { damage: 3, radius: 24, delay: 290, extraHits: 0, shake: 55 };
-    if (this.weapon === "gatling") return { damage: 1, radius: 26, delay: 48, extraHits: 0, shake: 18 };
-    return { damage: 1, radius: 28, delay: 210, extraHits: 0, shake: 45 };
+    return {
+      damage: 1 + this.gunDamageLevel,
+      radius: 28 + this.gunRangeLevel * 10,
+      delay: Math.max(90, 210 - this.gunReloadLevel * 32),
+      extraHits: 0,
+      pierce: this.gunPierceLevel,
+      shake: Math.max(18, 45 - this.gunReloadLevel * 3)
+    };
   }
 
   private throwDynamite() {
@@ -992,7 +1057,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.continuesLeft -= 1;
     this.isGameOver = false;
     this.waitingForContinue = false;
-    this.lives = 5;
+    this.lives = this.maxLives;
     this.combo = 0;
     this.invulnerableUntil = this.time.now + 3200;
     this.player.setAlpha(1);
@@ -1086,7 +1151,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private updateHud(status?: string) {
     this.scoreText.textContent = String(this.score);
     this.waveText.textContent = String(this.wave);
-    this.livesText.textContent = String(this.lives);
+    this.livesText.textContent = `${this.lives}/${this.maxLives}`;
     this.goldText.textContent = String(this.gold);
     this.comboText.textContent = this.bossSpawned ? "BOSS" : `${this.stageKills}/${this.killTarget}`;
     if (this.inShop) this.updateShop();
