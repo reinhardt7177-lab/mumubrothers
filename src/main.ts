@@ -11,7 +11,7 @@ function createShell() {
           <div><span>STAGE</span><strong id="wave">1</strong></div>
           <div><span>LIVES</span><strong id="lives">5</strong></div>
           <div><span>GOLD</span><strong id="gold">0</strong></div>
-          <div><span>KILLS</span><strong id="combo">0/50</strong></div>
+          <div><span>KILLS</span><strong id="combo">0/100</strong></div>
         </div>
         <div id="status" class="status">DRAW!</div>
         <div id="shop" class="shop hidden">
@@ -32,6 +32,18 @@ function createShell() {
         </div>
         <div id="intro" class="intro">
           <div class="intro-art" role="img" aria-label="Mumu Brothers intro artwork"></div>
+          <div class="chapter-select" aria-label="Chapter select">
+            <button class="chapter-card" data-chapter="1" type="button">
+              <span>CHAPTER 1</span>
+              <strong>Frontier Bloodline</strong>
+              <small>Dust towns, rail yards, mines</small>
+            </button>
+            <button class="chapter-card" data-chapter="2" type="button">
+              <span>CHAPTER 2</span>
+              <strong>Witchfire Bayou</strong>
+              <small>Cursed swamp and river ghosts</small>
+            </button>
+          </div>
           <button id="start-game" class="start-game" type="button">START</button>
         </div>
         <div class="touch-controls" aria-label="Touch controls">
@@ -94,9 +106,14 @@ type Enemy = {
   direction: number;
   coverY: number;
   isBoss: boolean;
+  isElite: boolean;
+  pattern: EnemyPattern;
+  nextSpecial: number;
   goldValue: number;
   alive: boolean;
 };
+
+type EnemyPattern = "shooter" | "charger" | "tank" | "skirmisher" | "trickster";
 
 type SpawnPoint = {
   x: number;
@@ -176,17 +193,17 @@ const BOSS_SPRITES = {
 };
 
 const SPAWN_POINTS: SpawnPoint[] = [
-  { x: 46, y: 306, minX: 24, maxX: 116, kind: "edge" },
-  { x: 116, y: 286, minX: 72, maxX: 168, kind: "window" },
-  { x: 254, y: 296, minX: 210, maxX: 302, kind: "door" },
-  { x: 388, y: 300, minX: 340, maxX: 430, kind: "street" },
-  { x: 522, y: 284, minX: 470, maxX: 584, kind: "balcony" },
-  { x: 632, y: 292, minX: 592, maxX: 682, kind: "window" },
-  { x: 752, y: 300, minX: 704, maxX: 802, kind: "door" },
-  { x: 888, y: 296, minX: 810, maxX: 924, kind: "edge" }
+  { x: 36, y: 324, minX: 16, maxX: 196, kind: "edge" },
+  { x: 132, y: 266, minX: 48, maxX: 276, kind: "window" },
+  { x: 248, y: 312, minX: 96, maxX: 398, kind: "door" },
+  { x: 382, y: 348, minX: 188, maxX: 560, kind: "street" },
+  { x: 522, y: 258, minX: 342, maxX: 696, kind: "balcony" },
+  { x: 642, y: 318, minX: 464, maxX: 816, kind: "window" },
+  { x: 766, y: 286, minX: 602, maxX: 918, kind: "door" },
+  { x: 910, y: 336, minX: 736, maxX: 944, kind: "edge" }
 ];
 
-const KILLS_TO_BOSS_BY_STAGE = [50, 100, 200, 300, 500, 150, 250, 350, 450, 650];
+const KILLS_TO_BOSS = 100;
 
 const STAGES: StageTheme[] = [
   { name: "Dustbell Main", skyTop: 0x35201a, skyBottom: 0xb86b32, ground: 0xb36c32, trim: 0xf2c66b, accent: 0xa7472e, signs: ["SALOON", "BANK", "HOTEL"], prop: "barrel", motif: "town", bossName: "Marshal Bragg", enemyTint: 0xffffff, bossTint: 0xffc45f, wash: 0.03, background: "stageBackground1", enemyPool: ["maskedOutlaw", "rifleDesperado"], bossEnemy: "armoredSheriff", bossSprite: "marshalBragg" },
@@ -218,7 +235,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private wave = 1;
   private combo = 0;
   private stageKills = 0;
-  private killTarget = 50;
+  private killTarget = KILLS_TO_BOSS;
   private bossSpawned = false;
   private gameStarted = false;
   private inShop = false;
@@ -236,6 +253,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private nextPlayerShot = 0;
   private nextEnemyShot = 0;
   private nextSpawn = 0;
+  private nextEliteKill = 20;
   private invulnerableUntil = 0;
   private continuesLeft = 3;
   private scoreText!: HTMLElement;
@@ -249,6 +267,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private shopGoldText!: HTMLElement;
   private introOverlay!: HTMLElement;
   private startButton!: HTMLButtonElement;
+  private chapterButtons: HTMLButtonElement[] = [];
   private touchDynamiteButton!: HTMLButtonElement;
   private buyDamageButton!: HTMLButtonElement;
   private buyRangeButton!: HTMLButtonElement;
@@ -344,7 +363,7 @@ class MumuBrothersScene extends Phaser.Scene {
     if (this.isPointerDown) this.shoot();
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.throwDynamite();
 
-    const activeCap = this.bossSpawned ? 8 : Math.min(16 + this.wave * 3, 32);
+    const activeCap = this.bossSpawned ? 10 : Math.min(20 + this.wave * 3, 38);
     if (time > this.nextSpawn && this.enemies.filter((enemy) => enemy.alive).length < activeCap) {
       this.spawnEnemy();
       this.nextSpawn = time + Math.max(140, 360 - this.wave * 22);
@@ -368,6 +387,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.shopGoldText = document.querySelector("#shop-gold")!;
     this.introOverlay = document.querySelector("#intro")!;
     this.startButton = document.querySelector("#start-game")!;
+    this.chapterButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-chapter]")];
     this.touchDynamiteButton = document.querySelector("#touch-dynamite")!;
     this.buyDamageButton = document.querySelector("#buy-damage")!;
     this.buyRangeButton = document.querySelector("#buy-range")!;
@@ -386,6 +406,10 @@ class MumuBrothersScene extends Phaser.Scene {
     this.buyDynamiteButton.addEventListener("click", () => this.buyShopItem("dynamite"));
     this.continueButton.addEventListener("click", () => this.leaveShop());
     this.startButton.addEventListener("click", () => this.startGame());
+    this.chapterButtons.forEach((button) => {
+      button.addEventListener("click", () => this.selectChapter(Number(button.dataset.chapter)));
+    });
+    this.refreshChapterSelect();
     this.statusText.addEventListener("click", () => {
       if (this.waitingForContinue) this.continueGame();
     });
@@ -434,6 +458,20 @@ class MumuBrothersScene extends Phaser.Scene {
       this.gold = Math.max(this.gold, 30);
       this.openShop();
     }
+  }
+
+  private selectChapter(chapter: number) {
+    if (this.gameStarted) return;
+    this.wave = chapter === 2 ? 6 : 1;
+    this.refreshChapterSelect();
+    this.updateHud(chapter === 2 ? "CHAPTER 2 READY" : "CHAPTER 1 READY");
+  }
+
+  private refreshChapterSelect() {
+    const activeChapter = this.wave >= 6 ? 2 : 1;
+    this.chapterButtons.forEach((button) => {
+      button.classList.toggle("selected", Number(button.dataset.chapter) === activeChapter);
+    });
   }
 
   private applyStartParams() {
@@ -612,12 +650,13 @@ class MumuBrothersScene extends Phaser.Scene {
     this.props.push({ sprite: c, body, hp: 3 });
   }
 
-  private createEnemy(point: SpawnPoint, isBoss = false): Enemy {
+  private createEnemy(point: SpawnPoint, isBoss = false, isElite = false): Enemy {
     const c = this.add.container(point.x, point.y + 18).setDepth(point.kind === "street" || point.kind === "edge" ? 5 : 4);
     c.setAlpha(0);
-    c.setScale(isBoss ? 1.18 : 0.78);
+    c.setScale(isBoss ? 1.18 : isElite ? 0.92 : 0.78);
     const shadow = this.add.ellipse(0, isBoss ? 52 : 34, isBoss ? 156 : 76, isBoss ? 32 : 18, 0x000000, 0.3);
     const enemyFrame = this.pickEnemyFrame(isBoss);
+    const pattern = isBoss ? "tank" : this.enemyPattern(enemyFrame);
     const bossFrame = this.currentTheme().bossSprite;
     const bossMeta = BOSS_SPRITES[bossFrame];
     const bossHeight = 213;
@@ -625,8 +664,12 @@ class MumuBrothersScene extends Phaser.Scene {
     const sprite = isBoss
       ? this.bossSprite(0, -58, bossFrame, bossWidth, bossHeight)
       : this.enemySprite(0, -24, enemyFrame, 100, 108);
-    c.add([shadow, sprite]);
-    const body = this.add.rectangle(point.x, point.y, isBoss ? 90 : 52, isBoss ? 130 : 88, 0xffffff, 0).setDepth(4);
+    const aura = isElite ? this.add.ellipse(0, 22, 86, 28, 0xffd24c, 0.24).setBlendMode(Phaser.BlendModes.ADD) : undefined;
+    if (isElite) sprite.setTint(0xffd36e);
+    c.add(aura ? [shadow, aura, sprite] : [shadow, sprite]);
+    const body = this.add.rectangle(point.x, point.y, isBoss ? 90 : isElite ? 62 : 52, isBoss ? 130 : isElite ? 98 : 88, 0xffffff, 0).setDepth(4);
+    const hp = isBoss ? 16 + this.wave * 7 : isElite ? 4 + Math.floor(this.wave / 2) : pattern === "tank" ? 2 : 1;
+    const speed = this.enemySpeed(pattern, isBoss, isElite);
     this.tweens.add({
       targets: c,
       y: point.y,
@@ -638,8 +681,8 @@ class MumuBrothersScene extends Phaser.Scene {
     return {
       sprite: c,
       body,
-      hp: isBoss ? 16 + this.wave * 7 : 1,
-      speed: isBoss ? 22 + this.wave * 2 : Phaser.Math.Between(44, 78) + this.wave * 2.6,
+      hp,
+      speed,
       lane: point.y,
       nextShot: this.time.now + Phaser.Math.Between(isBoss ? 950 : 1500, isBoss ? 1800 : 3100),
       nextMove: this.time.now + Phaser.Math.Between(700, 1600),
@@ -648,7 +691,10 @@ class MumuBrothersScene extends Phaser.Scene {
       direction: point.x < 480 ? 1 : -1,
       coverY: point.y,
       isBoss,
-      goldValue: isBoss ? 10 : 1,
+      isElite,
+      pattern,
+      nextSpecial: this.time.now + Phaser.Math.Between(1200, 2600),
+      goldValue: isBoss ? 10 : isElite ? 5 : 1,
       alive: true
     };
   }
@@ -671,7 +717,8 @@ class MumuBrothersScene extends Phaser.Scene {
     }
     this.stageKills = 0;
     this.bossSpawned = false;
-    this.killTarget = KILLS_TO_BOSS_BY_STAGE[this.wave - 1] ?? 500;
+    this.nextEliteKill = 20;
+    this.killTarget = KILLS_TO_BOSS;
     this.nextSpawn = this.time.now + 360;
     const count = Math.min(10 + this.wave * 2, 18);
     for (let i = 0; i < count; i += 1) this.spawnEnemy();
@@ -685,7 +732,10 @@ class MumuBrothersScene extends Phaser.Scene {
     );
     const candidates = SPAWN_POINTS.filter((point) => !occupied.has(Math.round(point.y / 10) * 10 + ":" + Math.round(point.x / 80)));
     const point = Phaser.Utils.Array.GetRandom(candidates.length ? candidates : SPAWN_POINTS);
-    this.enemies.push(this.createEnemy(point));
+    const isElite = !this.bossSpawned && this.stageKills >= this.nextEliteKill;
+    if (isElite) this.nextEliteKill += 20;
+    this.enemies.push(this.createEnemy(point, false, isElite));
+    if (isElite) this.updateHud("ELITE OUTLAW!");
   }
 
   private spawnBoss() {
@@ -749,22 +799,14 @@ class MumuBrothersScene extends Phaser.Scene {
   private updateEnemies(time: number, delta: number) {
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
-      if (time > enemy.nextMove) {
-        enemy.direction = Math.random() > 0.5 ? 1 : -1;
-        enemy.nextMove = time + Phaser.Math.Between(650, 1550);
-      }
-      enemy.sprite.x += enemy.direction * enemy.speed * (delta / 1000);
-      if (enemy.sprite.x <= enemy.minX || enemy.sprite.x >= enemy.maxX) {
-        enemy.direction *= -1;
-      }
-      enemy.sprite.x = Phaser.Math.Clamp(enemy.sprite.x, enemy.minX, enemy.maxX);
-      enemy.sprite.y = enemy.coverY + Math.sin((time + enemy.lane * 7) / 360) * 2.2;
+      this.moveEnemy(enemy, time, delta);
       enemy.body.setPosition(enemy.sprite.x, enemy.sprite.y);
       enemy.sprite.setScale(enemy.sprite.x < this.player.x ? 1 : -1, 1);
 
       if (
         time > enemy.nextShot &&
         time > this.nextEnemyShot &&
+        this.enemyCanShoot(enemy) &&
         Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, this.player.x, this.player.y) < 640
       ) {
         const start = new Phaser.Math.Vector2(enemy.sprite.x, enemy.sprite.y - 18);
@@ -777,13 +819,53 @@ class MumuBrothersScene extends Phaser.Scene {
           duration: 95,
           ease: "Quad.easeOut"
         });
-        const bulletSpeed = enemy.isBoss ? 285 + this.wave * 8 : 245 + this.wave * 6;
+        const bulletSpeed = enemy.isBoss ? 285 + this.wave * 8 : enemy.isElite ? 285 + this.wave * 7 : 245 + this.wave * 6;
         this.spawnBullet(start.x, start.y, direction.x * bulletSpeed, direction.y * bulletSpeed, false);
         this.flash(start.x + direction.x * 24, start.y + direction.y * 24, enemy.isBoss ? 0xffd24c : 0xff6048);
-        enemy.nextShot = time + Phaser.Math.Between(enemy.isBoss ? 1250 : 1700, enemy.isBoss ? 2100 : 3300);
-        this.nextEnemyShot = time + (enemy.isBoss ? 240 : 360);
+        enemy.nextShot = time + this.enemyShotDelay(enemy);
+        this.nextEnemyShot = time + (enemy.isBoss ? 240 : enemy.isElite ? 280 : 360);
       }
     }
+  }
+
+  private moveEnemy(enemy: Enemy, time: number, delta: number) {
+    if (enemy.pattern === "trickster" && !enemy.isBoss && time > enemy.nextSpecial) {
+      enemy.sprite.alpha = 0.35;
+      enemy.sprite.x = Phaser.Math.Between(enemy.minX, enemy.maxX);
+      enemy.coverY = Phaser.Math.Clamp(enemy.coverY + Phaser.Math.Between(-42, 42), 238, 370);
+      this.tweens.add({ targets: enemy.sprite, alpha: 1, duration: 160, ease: "Quad.easeOut" });
+      enemy.nextSpecial = time + Phaser.Math.Between(enemy.isElite ? 1400 : 2300, enemy.isElite ? 2400 : 3800);
+    }
+
+    if (time > enemy.nextMove) {
+      if (enemy.pattern === "charger") {
+        enemy.direction = enemy.sprite.x < this.player.x ? 1 : -1;
+      } else {
+        enemy.direction = Math.random() > 0.5 ? 1 : -1;
+      }
+      enemy.nextMove = time + Phaser.Math.Between(enemy.pattern === "skirmisher" ? 420 : 650, enemy.pattern === "tank" ? 1900 : 1450);
+    }
+
+    const pursuit = enemy.pattern === "charger" ? (enemy.sprite.x < this.player.x ? 1 : -1) : enemy.direction;
+    enemy.sprite.x += pursuit * enemy.speed * (delta / 1000);
+    if (enemy.sprite.x <= enemy.minX || enemy.sprite.x >= enemy.maxX) enemy.direction *= -1;
+    enemy.sprite.x = Phaser.Math.Clamp(enemy.sprite.x, enemy.minX, enemy.maxX);
+
+    const bob = enemy.pattern === "skirmisher" ? 8 : enemy.pattern === "trickster" ? 12 : 3;
+    const drift = enemy.pattern === "charger" ? Math.sin(time / 260) * 10 : Math.sin((time + enemy.lane * 7) / 360) * bob;
+    enemy.sprite.y = Phaser.Math.Clamp(enemy.coverY + drift, 230, 382);
+  }
+
+  private enemyCanShoot(enemy: Enemy) {
+    return enemy.isBoss || enemy.isElite || enemy.pattern === "shooter" || enemy.pattern === "skirmisher" || enemy.pattern === "trickster";
+  }
+
+  private enemyShotDelay(enemy: Enemy) {
+    if (enemy.isBoss) return Phaser.Math.Between(1250, 2100);
+    if (enemy.isElite) return Phaser.Math.Between(1150, 2050);
+    if (enemy.pattern === "shooter") return Phaser.Math.Between(1450, 2550);
+    if (enemy.pattern === "skirmisher") return Phaser.Math.Between(1750, 2900);
+    return Phaser.Math.Between(2100, 3400);
   }
 
   private updateBullets(delta: number) {
@@ -901,7 +983,7 @@ class MumuBrothersScene extends Phaser.Scene {
         this.updateHud(`KILLS ${this.stageKills}/${this.killTarget}`);
       }
     }
-    this.pop(enemy.sprite.x, enemy.sprite.y, enemy.isBoss ? `+${enemy.goldValue}G BOSS` : "+1G");
+    this.pop(enemy.sprite.x, enemy.sprite.y, enemy.isBoss ? `+${enemy.goldValue}G BOSS` : enemy.isElite ? `+${enemy.goldValue}G ELITE` : "+1G");
     this.explode(enemy.sprite.x, enemy.sprite.y);
     enemy.sprite.destroy();
     enemy.body.destroy();
@@ -1246,6 +1328,20 @@ class MumuBrothersScene extends Phaser.Scene {
     return (isBoss
       ? theme.bossEnemy
       : Phaser.Utils.Array.GetRandom(theme.enemyPool)) as keyof typeof ENEMY_SPRITES;
+  }
+
+  private enemyPattern(frameName: keyof typeof ENEMY_SPRITES): EnemyPattern {
+    if (["cactusMutant", "swampZombie", "boneAlligator", "armoredSheriff"].includes(frameName)) return "tank";
+    if (["scorpionBandit", "poisonFrog", "leechMutant", "demonOutlaw"].includes(frameName)) return "charger";
+    if (["ghostMiner", "wispGunslinger", "mossWitch", "vampireCowboy"].includes(frameName)) return "trickster";
+    if (["maskedOutlaw", "trainRobber", "gatorOutlaw", "mosquitoGunslinger"].includes(frameName)) return "skirmisher";
+    return "shooter";
+  }
+
+  private enemySpeed(pattern: EnemyPattern, isBoss: boolean, isElite: boolean) {
+    const base = isBoss ? 22 + this.wave * 2 : Phaser.Math.Between(44, 78) + this.wave * 2.6;
+    const patternBoost = { shooter: 1, charger: 1.36, tank: 0.72, skirmisher: 1.18, trickster: 0.94 }[pattern];
+    return base * patternBoost * (isElite ? 1.16 : 1);
   }
 
   private pixelRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number) {
