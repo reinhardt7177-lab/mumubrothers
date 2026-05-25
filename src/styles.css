@@ -292,6 +292,8 @@ body {
 
 .status.large {
   font-size: 30px;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .touch-controls {

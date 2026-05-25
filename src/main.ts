@@ -76,6 +76,7 @@ type StageTheme = {
   background: string;
   enemyPool: string[];
   bossEnemy: string;
+  bossSprite: keyof typeof BOSS_SPRITES;
 };
 
 type Enemy = {
@@ -149,6 +150,14 @@ const ENEMY_SPRITES = {
   demonOutlaw: { texture: "enemyTypes3", x: 603, y: 28, w: 330, h: 456 }
 };
 
+const BOSS_SPRITES = {
+  marshalBragg: { texture: "bossTypes", x: 88, y: 46, w: 464, h: 548 },
+  cactusJack: { texture: "bossTypes", x: 736, y: 46, w: 448, h: 548 },
+  ironBelle: { texture: "bossTypes", x: 1368, y: 46, w: 464, h: 548 },
+  coalBaron: { texture: "bossTypes", x: 121, y: 686, w: 397, h: 548 },
+  lastBrother: { texture: "bossTypes", x: 761, y: 686, w: 397, h: 548 }
+};
+
 const SPAWN_POINTS: SpawnPoint[] = [
   { x: 46, y: 306, minX: 24, maxX: 116, kind: "edge" },
   { x: 116, y: 286, minX: 72, maxX: 168, kind: "window" },
@@ -163,11 +172,11 @@ const SPAWN_POINTS: SpawnPoint[] = [
 const KILLS_TO_BOSS_BY_STAGE = [50, 100, 200, 300, 500];
 
 const STAGES: StageTheme[] = [
-  { name: "Dustbell Main", skyTop: 0x35201a, skyBottom: 0xb86b32, ground: 0xb36c32, trim: 0xf2c66b, accent: 0xa7472e, signs: ["SALOON", "BANK", "HOTEL"], prop: "barrel", motif: "town", bossName: "Marshal Bragg", enemyTint: 0xffffff, bossTint: 0xffc45f, wash: 0.03, background: "stageBackground1", enemyPool: ["maskedOutlaw", "rifleDesperado"], bossEnemy: "armoredSheriff" },
-  { name: "Red Mesa", skyTop: 0x45251e, skyBottom: 0xd0843e, ground: 0xc96f35, trim: 0xf4c96e, accent: 0xb74b2d, signs: ["DEPOT", "JAIL", "STORE"], prop: "cactus", motif: "desert", bossName: "Cactus Jack", enemyTint: 0xffffff, bossTint: 0x9cff73, wash: 0.04, background: "stageBackground2", enemyPool: ["cactusMutant", "scorpionBandit", "dynamiteThrower"], bossEnemy: "cactusMutant" },
-  { name: "Coyote Rail", skyTop: 0x26314a, skyBottom: 0xb66537, ground: 0x9f6633, trim: 0xd9b15a, accent: 0x4e684d, signs: ["STATION", "CARGO", "WATER"], prop: "crate", motif: "rail", bossName: "Iron Belle", enemyTint: 0xffffff, bossTint: 0x82a8ff, wash: 0.05, background: "stageBackground3", enemyPool: ["trainRobber", "rifleDesperado", "dynamiteThrower"], bossEnemy: "armoredSheriff" },
-  { name: "Black Spur Mine", skyTop: 0x17191f, skyBottom: 0x6b4b36, ground: 0x71543e, trim: 0xcaa45c, accent: 0x385d4f, signs: ["MINE", "ASSAY", "TOOLS"], prop: "ore", motif: "mine", bossName: "Coal Baron", enemyTint: 0xffffff, bossTint: 0xff7777, wash: 0.07, background: "stageBackground4", enemyPool: ["ghostMiner", "trainRobber", "armoredSheriff"], bossEnemy: "ghostMiner" },
-  { name: "Boss Town", skyTop: 0x120e16, skyBottom: 0x5a2532, ground: 0x5e3732, trim: 0xffcc6d, accent: 0x9f2525, signs: ["BOSS", "BLOOD", "END"], prop: "lantern", motif: "fort", bossName: "The Last Brother", enemyTint: 0xffffff, bossTint: 0xff3c3c, wash: 0.06, background: "stageBackground5", enemyPool: ["vampireCowboy", "demonOutlaw", "armoredSheriff"], bossEnemy: "demonOutlaw" }
+  { name: "Dustbell Main", skyTop: 0x35201a, skyBottom: 0xb86b32, ground: 0xb36c32, trim: 0xf2c66b, accent: 0xa7472e, signs: ["SALOON", "BANK", "HOTEL"], prop: "barrel", motif: "town", bossName: "Marshal Bragg", enemyTint: 0xffffff, bossTint: 0xffc45f, wash: 0.03, background: "stageBackground1", enemyPool: ["maskedOutlaw", "rifleDesperado"], bossEnemy: "armoredSheriff", bossSprite: "marshalBragg" },
+  { name: "Red Mesa", skyTop: 0x45251e, skyBottom: 0xd0843e, ground: 0xc96f35, trim: 0xf4c96e, accent: 0xb74b2d, signs: ["DEPOT", "JAIL", "STORE"], prop: "cactus", motif: "desert", bossName: "Cactus Jack", enemyTint: 0xffffff, bossTint: 0x9cff73, wash: 0.04, background: "stageBackground2", enemyPool: ["cactusMutant", "scorpionBandit", "dynamiteThrower"], bossEnemy: "cactusMutant", bossSprite: "cactusJack" },
+  { name: "Coyote Rail", skyTop: 0x26314a, skyBottom: 0xb66537, ground: 0x9f6633, trim: 0xd9b15a, accent: 0x4e684d, signs: ["STATION", "CARGO", "WATER"], prop: "crate", motif: "rail", bossName: "Iron Belle", enemyTint: 0xffffff, bossTint: 0x82a8ff, wash: 0.05, background: "stageBackground3", enemyPool: ["trainRobber", "rifleDesperado", "dynamiteThrower"], bossEnemy: "armoredSheriff", bossSprite: "ironBelle" },
+  { name: "Black Spur Mine", skyTop: 0x17191f, skyBottom: 0x6b4b36, ground: 0x71543e, trim: 0xcaa45c, accent: 0x385d4f, signs: ["MINE", "ASSAY", "TOOLS"], prop: "ore", motif: "mine", bossName: "Coal Baron", enemyTint: 0xffffff, bossTint: 0xff7777, wash: 0.07, background: "stageBackground4", enemyPool: ["ghostMiner", "trainRobber", "armoredSheriff"], bossEnemy: "ghostMiner", bossSprite: "coalBaron" },
+  { name: "Boss Town", skyTop: 0x120e16, skyBottom: 0x5a2532, ground: 0x5e3732, trim: 0xffcc6d, accent: 0x9f2525, signs: ["BOSS", "BLOOD", "END"], prop: "lantern", motif: "fort", bossName: "The Last Brother", enemyTint: 0xffffff, bossTint: 0xff3c3c, wash: 0.06, background: "stageBackground5", enemyPool: ["vampireCowboy", "demonOutlaw", "armoredSheriff"], bossEnemy: "demonOutlaw", bossSprite: "lastBrother" }
 ];
 
 class MumuBrothersScene extends Phaser.Scene {
@@ -200,6 +209,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private nextEnemyShot = 0;
   private nextSpawn = 0;
   private invulnerableUntil = 0;
+  private continuesLeft = 3;
   private scoreText!: HTMLElement;
   private waveText!: HTMLElement;
   private livesText!: HTMLElement;
@@ -219,6 +229,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private buyDynamiteButton!: HTMLButtonElement;
   private continueButton!: HTMLButtonElement;
   private isGameOver = false;
+  private waitingForContinue = false;
 
   constructor() {
     super("mumu-brothers");
@@ -234,6 +245,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.load.image("enemyTypes1", "/assets/enemy-types-1.png");
     this.load.image("enemyTypes2", "/assets/enemy-types-2.png");
     this.load.image("enemyTypes3", "/assets/enemy-types-3.png");
+    this.load.image("bossTypes", "/assets/boss-types.png");
   }
 
   create() {
@@ -249,6 +261,10 @@ class MumuBrothersScene extends Phaser.Scene {
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => this.reticle.setPosition(pointer.x, pointer.y));
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       if (!this.gameStarted) return;
+      if (this.waitingForContinue) {
+        this.continueGame();
+        return;
+      }
       this.isPointerDown = true;
       this.reticle.setPosition(pointer.x, pointer.y);
       this.shoot();
@@ -267,7 +283,11 @@ class MumuBrothersScene extends Phaser.Scene {
     if (this.inShop) return;
 
     if (this.isGameOver) {
-      if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.scene.restart();
+      if (this.waitingForContinue && (Phaser.Input.Keyboard.JustDown(this.keys.ENTER) || Phaser.Input.Keyboard.JustDown(this.keys.SPACE))) {
+        this.continueGame();
+      } else if (Phaser.Input.Keyboard.JustDown(this.keys.R)) {
+        this.scene.restart();
+      }
       return;
     }
 
@@ -321,6 +341,9 @@ class MumuBrothersScene extends Phaser.Scene {
     this.buyDynamiteButton.addEventListener("click", () => this.buyShopItem("dynamite"));
     this.continueButton.addEventListener("click", () => this.leaveShop());
     this.startButton.addEventListener("click", () => this.startGame());
+    this.statusText.addEventListener("click", () => {
+      if (this.waitingForContinue) this.continueGame();
+    });
     this.bindTouchControls();
   }
 
@@ -548,11 +571,17 @@ class MumuBrothersScene extends Phaser.Scene {
     const c = this.add.container(point.x, point.y + 18).setDepth(point.kind === "street" || point.kind === "edge" ? 5 : 4);
     c.setAlpha(0);
     c.setScale(isBoss ? 1.18 : 0.78);
-    const shadow = this.add.ellipse(0, isBoss ? 46 : 34, isBoss ? 132 : 76, isBoss ? 26 : 18, 0x000000, 0.3);
+    const shadow = this.add.ellipse(0, isBoss ? 52 : 34, isBoss ? 156 : 76, isBoss ? 32 : 18, 0x000000, 0.3);
     const enemyFrame = this.pickEnemyFrame(isBoss);
-    const sprite = this.enemySprite(0, isBoss ? -34 : -24, enemyFrame, isBoss ? 172 : 100, isBoss ? 150 : 108);
+    const bossFrame = this.currentTheme().bossSprite;
+    const bossMeta = BOSS_SPRITES[bossFrame];
+    const bossHeight = 252;
+    const bossWidth = Math.round((bossMeta.w / bossMeta.h) * bossHeight);
+    const sprite = isBoss
+      ? this.bossSprite(0, -62, bossFrame, bossWidth, bossHeight)
+      : this.enemySprite(0, -24, enemyFrame, 100, 108);
     c.add([shadow, sprite]);
-    const body = this.add.rectangle(point.x, point.y, isBoss ? 96 : 52, isBoss ? 132 : 88, 0xffffff, 0).setDepth(4);
+    const body = this.add.rectangle(point.x, point.y, isBoss ? 118 : 52, isBoss ? 162 : 88, 0xffffff, 0).setDepth(4);
     this.tweens.add({
       targets: c,
       y: point.y,
@@ -940,12 +969,37 @@ class MumuBrothersScene extends Phaser.Scene {
     this.cameras.main.shake(220, 0.01);
     this.time.delayedCall(2100, () => this.player.setAlpha(1));
     if (this.lives <= 0) {
-      this.isGameOver = true;
-      this.updateHud("GAME OVER - R TO RESTART");
-      this.statusText.classList.add("large");
+      this.offerContinue();
     } else {
       this.updateHud("HIT!");
     }
+  }
+
+  private offerContinue() {
+    this.isGameOver = true;
+    this.waitingForContinue = this.continuesLeft > 0;
+    this.statusText.classList.add("large");
+    if (this.waitingForContinue) {
+      this.updateHud(`TO BE CONTINUED? ${this.continuesLeft} LEFT - ENTER/TAP`);
+    } else {
+      this.updateHud("GAME OVER - R TO RESTART");
+    }
+  }
+
+  private continueGame() {
+    if (!this.waitingForContinue || this.continuesLeft <= 0) return;
+    this.continuesLeft -= 1;
+    this.isGameOver = false;
+    this.waitingForContinue = false;
+    this.lives = 5;
+    this.combo = 0;
+    this.invulnerableUntil = this.time.now + 3200;
+    this.player.setAlpha(1);
+    for (const bullet of [...this.bullets]) this.destroyBullet(bullet);
+    this.player.setPosition(480, 442);
+    this.playerBody.setPosition(480, 442);
+    this.statusText.classList.remove("large");
+    this.updateHud(`CONTINUE! ${this.continuesLeft} LEFT`);
   }
 
   private rectangleHit(circle: Phaser.GameObjects.Arc, rect: Phaser.GameObjects.Rectangle) {
@@ -1065,6 +1119,12 @@ class MumuBrothersScene extends Phaser.Scene {
         enemyTexture.add(name, 0, frame.x, frame.y, frame.w, frame.h);
       }
     }
+    const bossTexture = this.textures.get("bossTypes");
+    for (const [name, frame] of Object.entries(BOSS_SPRITES)) {
+      if (!bossTexture.has(name)) {
+        bossTexture.add(name, 0, frame.x, frame.y, frame.w, frame.h);
+      }
+    }
   }
 
   private sheetSprite(x: number, y: number, frameName: keyof typeof SPRITES, displayW: number, displayH: number) {
@@ -1075,6 +1135,12 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private enemySprite(x: number, y: number, frameName: keyof typeof ENEMY_SPRITES, displayW: number, displayH: number) {
     const sprite = this.add.image(x, y, ENEMY_SPRITES[frameName].texture, frameName);
+    sprite.setDisplaySize(displayW, displayH);
+    return sprite;
+  }
+
+  private bossSprite(x: number, y: number, frameName: keyof typeof BOSS_SPRITES, displayW: number, displayH: number) {
+    const sprite = this.add.image(x, y, BOSS_SPRITES[frameName].texture, frameName);
     sprite.setDisplaySize(displayW, displayH);
     return sprite;
   }
