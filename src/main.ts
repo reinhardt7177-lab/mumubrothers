@@ -151,11 +151,11 @@ const ENEMY_SPRITES = {
 };
 
 const BOSS_SPRITES = {
-  marshalBragg: { texture: "bossTypes", x: 88, y: 46, w: 464, h: 548 },
-  cactusJack: { texture: "bossTypes", x: 736, y: 46, w: 448, h: 548 },
-  ironBelle: { texture: "bossTypes", x: 1368, y: 46, w: 464, h: 548 },
-  coalBaron: { texture: "bossTypes", x: 121, y: 686, w: 397, h: 548 },
-  lastBrother: { texture: "bossTypes", x: 761, y: 686, w: 397, h: 548 }
+  marshalBragg: { texture: "bossTypes1", x: 21, y: 101, w: 570, h: 642 },
+  cactusJack: { texture: "bossTypes1", x: 591, y: 104, w: 591, h: 633 },
+  ironBelle: { texture: "bossTypes1", x: 1182, y: 121, w: 588, h: 629 },
+  coalBaron: { texture: "bossTypes2", x: 90, y: 118, w: 678, h: 757 },
+  lastBrother: { texture: "bossTypes2", x: 768, y: 77, w: 696, h: 814 }
 };
 
 const SPAWN_POINTS: SpawnPoint[] = [
@@ -245,7 +245,8 @@ class MumuBrothersScene extends Phaser.Scene {
     this.load.image("enemyTypes1", "/assets/enemy-types-1.png");
     this.load.image("enemyTypes2", "/assets/enemy-types-2.png");
     this.load.image("enemyTypes3", "/assets/enemy-types-3.png");
-    this.load.image("bossTypes", "/assets/boss-types.png");
+    this.load.image("bossTypes1", "/assets/boss-types-1.png");
+    this.load.image("bossTypes2", "/assets/boss-types-2.png");
   }
 
   create() {
@@ -575,13 +576,13 @@ class MumuBrothersScene extends Phaser.Scene {
     const enemyFrame = this.pickEnemyFrame(isBoss);
     const bossFrame = this.currentTheme().bossSprite;
     const bossMeta = BOSS_SPRITES[bossFrame];
-    const bossHeight = 252;
+    const bossHeight = 320;
     const bossWidth = Math.round((bossMeta.w / bossMeta.h) * bossHeight);
     const sprite = isBoss
-      ? this.bossSprite(0, -62, bossFrame, bossWidth, bossHeight)
+      ? this.bossSprite(0, -86, bossFrame, bossWidth, bossHeight)
       : this.enemySprite(0, -24, enemyFrame, 100, 108);
     c.add([shadow, sprite]);
-    const body = this.add.rectangle(point.x, point.y, isBoss ? 118 : 52, isBoss ? 162 : 88, 0xffffff, 0).setDepth(4);
+    const body = this.add.rectangle(point.x, point.y, isBoss ? 130 : 52, isBoss ? 190 : 88, 0xffffff, 0).setDepth(4);
     this.tweens.add({
       targets: c,
       y: point.y,
@@ -1119,8 +1120,8 @@ class MumuBrothersScene extends Phaser.Scene {
         enemyTexture.add(name, 0, frame.x, frame.y, frame.w, frame.h);
       }
     }
-    const bossTexture = this.textures.get("bossTypes");
     for (const [name, frame] of Object.entries(BOSS_SPRITES)) {
+      const bossTexture = this.textures.get(frame.texture);
       if (!bossTexture.has(name)) {
         bossTexture.add(name, 0, frame.x, frame.y, frame.w, frame.h);
       }
