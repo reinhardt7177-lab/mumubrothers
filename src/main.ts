@@ -48,7 +48,7 @@ function createShell() {
       </section>
       <aside class="panel">
         <h1>Mumu Brothers</h1>
-        <p>5-stage boss rush frontier shooter</p>
+        <p>10-stage boss rush frontier shooter</p>
         <div class="controls">
           <span>A/D or arrows</span><b>move</b>
           <span>Mouse</span><b>aim</b>
@@ -149,7 +149,17 @@ const ENEMY_SPRITES = {
   trainRobber: { texture: "enemyTypes2", x: 110, y: 581, w: 292, h: 374 },
   armoredSheriff: { texture: "enemyTypes2", x: 585, y: 552, w: 366, h: 432 },
   vampireCowboy: { texture: "enemyTypes3", x: 87, y: 50, w: 338, h: 412 },
-  demonOutlaw: { texture: "enemyTypes3", x: 603, y: 28, w: 330, h: 456 }
+  demonOutlaw: { texture: "enemyTypes3", x: 603, y: 28, w: 330, h: 456 },
+  swampZombie: { texture: "swampEnemies1", x: 16, y: 147, w: 423, h: 560 },
+  gatorOutlaw: { texture: "swampEnemies1", x: 443, y: 160, w: 444, h: 541 },
+  poisonFrog: { texture: "swampEnemies1", x: 887, y: 189, w: 443, h: 505 },
+  wispGunslinger: { texture: "swampEnemies1", x: 1330, y: 153, w: 421, h: 554 },
+  voodooMask: { texture: "swampEnemies2", x: 9, y: 114, w: 434, h: 613 },
+  skeletalFerryman: { texture: "swampEnemies2", x: 443, y: 152, w: 444, h: 579 },
+  leechMutant: { texture: "swampEnemies2", x: 887, y: 161, w: 443, h: 561 },
+  mossWitch: { texture: "swampEnemies2", x: 1330, y: 129, w: 430, h: 590 },
+  mosquitoGunslinger: { texture: "swampEnemies3", x: 39, y: 121, w: 848, h: 632 },
+  boneAlligator: { texture: "swampEnemies3", x: 887, y: 165, w: 883, h: 568 }
 };
 
 const BOSS_SPRITES = {
@@ -157,7 +167,12 @@ const BOSS_SPRITES = {
   cactusJack: { texture: "bossTypes1", x: 591, y: 104, w: 591, h: 633 },
   ironBelle: { texture: "bossTypes1", x: 1182, y: 121, w: 588, h: 629 },
   coalBaron: { texture: "bossTypes2", x: 90, y: 118, w: 678, h: 757 },
-  lastBrother: { texture: "bossTypes2", x: 768, y: 77, w: 696, h: 814 }
+  lastBrother: { texture: "bossTypes2", x: 768, y: 77, w: 696, h: 814 },
+  gatorKing: { texture: "swampBosses1", x: 3, y: 43, w: 588, h: 768 },
+  candleWitch: { texture: "swampBosses1", x: 591, y: 35, w: 591, h: 782 },
+  steamboatRevenant: { texture: "swampBosses1", x: 1182, y: 100, w: 560, h: 711 },
+  boneMarketBaron: { texture: "swampBosses2", x: 0, y: 52, w: 858, h: 807 },
+  heartrootLeviathan: { texture: "swampBosses2", x: 858, y: 6, w: 822, h: 892 }
 };
 
 const SPAWN_POINTS: SpawnPoint[] = [
@@ -171,14 +186,19 @@ const SPAWN_POINTS: SpawnPoint[] = [
   { x: 888, y: 296, minX: 810, maxX: 924, kind: "edge" }
 ];
 
-const KILLS_TO_BOSS_BY_STAGE = [50, 100, 200, 300, 500];
+const KILLS_TO_BOSS_BY_STAGE = [50, 100, 200, 300, 500, 150, 250, 350, 450, 650];
 
 const STAGES: StageTheme[] = [
   { name: "Dustbell Main", skyTop: 0x35201a, skyBottom: 0xb86b32, ground: 0xb36c32, trim: 0xf2c66b, accent: 0xa7472e, signs: ["SALOON", "BANK", "HOTEL"], prop: "barrel", motif: "town", bossName: "Marshal Bragg", enemyTint: 0xffffff, bossTint: 0xffc45f, wash: 0.03, background: "stageBackground1", enemyPool: ["maskedOutlaw", "rifleDesperado"], bossEnemy: "armoredSheriff", bossSprite: "marshalBragg" },
   { name: "Red Mesa", skyTop: 0x45251e, skyBottom: 0xd0843e, ground: 0xc96f35, trim: 0xf4c96e, accent: 0xb74b2d, signs: ["DEPOT", "JAIL", "STORE"], prop: "cactus", motif: "desert", bossName: "Cactus Jack", enemyTint: 0xffffff, bossTint: 0x9cff73, wash: 0.04, background: "stageBackground2", enemyPool: ["cactusMutant", "scorpionBandit", "dynamiteThrower"], bossEnemy: "cactusMutant", bossSprite: "cactusJack" },
   { name: "Coyote Rail", skyTop: 0x26314a, skyBottom: 0xb66537, ground: 0x9f6633, trim: 0xd9b15a, accent: 0x4e684d, signs: ["STATION", "CARGO", "WATER"], prop: "crate", motif: "rail", bossName: "Iron Belle", enemyTint: 0xffffff, bossTint: 0x82a8ff, wash: 0.05, background: "stageBackground3", enemyPool: ["trainRobber", "rifleDesperado", "dynamiteThrower"], bossEnemy: "armoredSheriff", bossSprite: "ironBelle" },
   { name: "Black Spur Mine", skyTop: 0x17191f, skyBottom: 0x6b4b36, ground: 0x71543e, trim: 0xcaa45c, accent: 0x385d4f, signs: ["MINE", "ASSAY", "TOOLS"], prop: "ore", motif: "mine", bossName: "Coal Baron", enemyTint: 0xffffff, bossTint: 0xff7777, wash: 0.07, background: "stageBackground4", enemyPool: ["ghostMiner", "trainRobber", "armoredSheriff"], bossEnemy: "ghostMiner", bossSprite: "coalBaron" },
-  { name: "Boss Town", skyTop: 0x120e16, skyBottom: 0x5a2532, ground: 0x5e3732, trim: 0xffcc6d, accent: 0x9f2525, signs: ["BOSS", "BLOOD", "END"], prop: "lantern", motif: "fort", bossName: "The Last Brother", enemyTint: 0xffffff, bossTint: 0xff3c3c, wash: 0.06, background: "stageBackground5", enemyPool: ["vampireCowboy", "demonOutlaw", "armoredSheriff"], bossEnemy: "demonOutlaw", bossSprite: "lastBrother" }
+  { name: "Boss Town", skyTop: 0x120e16, skyBottom: 0x5a2532, ground: 0x5e3732, trim: 0xffcc6d, accent: 0x9f2525, signs: ["BOSS", "BLOOD", "END"], prop: "lantern", motif: "fort", bossName: "The Last Brother", enemyTint: 0xffffff, bossTint: 0xff3c3c, wash: 0.06, background: "stageBackground5", enemyPool: ["vampireCowboy", "demonOutlaw", "armoredSheriff"], bossEnemy: "demonOutlaw", bossSprite: "lastBrother" },
+  { name: "Cursed Swamp Outpost", skyTop: 0x10251d, skyBottom: 0x2e6a4d, ground: 0x314024, trim: 0x9adf8e, accent: 0x5bcf80, signs: ["SWAMP", "DOCK", "FROG"], prop: "lantern", motif: "river", bossName: "Gator King", enemyTint: 0xffffff, bossTint: 0x8cff7a, wash: 0.06, background: "stageBackground6", enemyPool: ["swampZombie", "gatorOutlaw", "poisonFrog"], bossEnemy: "gatorOutlaw", bossSprite: "gatorKing" },
+  { name: "Witchfire Bayou", skyTop: 0x140d25, skyBottom: 0x295b37, ground: 0x263820, trim: 0xd7a75b, accent: 0x8d55c7, signs: ["BAYOU", "HEX", "BONE"], prop: "lantern", motif: "night", bossName: "Candle Witch Queen", enemyTint: 0xffffff, bossTint: 0xd98cff, wash: 0.07, background: "stageBackground7", enemyPool: ["wispGunslinger", "voodooMask", "mossWitch"], bossEnemy: "mossWitch", bossSprite: "candleWitch" },
+  { name: "Steamboat Graveyard", skyTop: 0x10222b, skyBottom: 0x27605c, ground: 0x35412f, trim: 0x8fe5d2, accent: 0xb4773e, signs: ["RIVER", "WRECK", "CHAIN"], prop: "crate", motif: "river", bossName: "Steamboat Revenant", enemyTint: 0xffffff, bossTint: 0x9effee, wash: 0.06, background: "stageBackground8", enemyPool: ["skeletalFerryman", "leechMutant", "mosquitoGunslinger"], bossEnemy: "skeletalFerryman", bossSprite: "steamboatRevenant" },
+  { name: "Voodoo Bone Market", skyTop: 0x1b1021, skyBottom: 0x3a5730, ground: 0x3b3023, trim: 0xffd176, accent: 0xb35ad8, signs: ["MASK", "CHARM", "BREW"], prop: "barrel", motif: "night", bossName: "Bone Market Baron", enemyTint: 0xffffff, bossTint: 0xffd176, wash: 0.07, background: "stageBackground9", enemyPool: ["voodooMask", "boneAlligator", "poisonFrog"], bossEnemy: "voodooMask", bossSprite: "boneMarketBaron" },
+  { name: "Heartroot Swamp", skyTop: 0x0b1110, skyBottom: 0x1d5a35, ground: 0x223421, trim: 0x7aff9e, accent: 0x23d276, signs: ["ROOT", "CURSE", "END"], prop: "ore", motif: "fort", bossName: "Heartroot Leviathan", enemyTint: 0xffffff, bossTint: 0x7aff9e, wash: 0.08, background: "stageBackground10", enemyPool: ["mossWitch", "wispGunslinger", "leechMutant", "boneAlligator"], bossEnemy: "boneAlligator", bossSprite: "heartrootLeviathan" }
 ];
 
 class MumuBrothersScene extends Phaser.Scene {
@@ -251,12 +271,22 @@ class MumuBrothersScene extends Phaser.Scene {
     this.load.image("stageBackground3", "/assets/stage-3-coyote-rail.png");
     this.load.image("stageBackground4", "/assets/stage-4-black-spur-mine.png");
     this.load.image("stageBackground5", "/assets/stage-5-boss-town.png");
+    this.load.image("stageBackground6", "/assets/stage-6-cursed-swamp-outpost.png");
+    this.load.image("stageBackground7", "/assets/stage-7-witchfire-bayou.png");
+    this.load.image("stageBackground8", "/assets/stage-8-steamboat-graveyard.png");
+    this.load.image("stageBackground9", "/assets/stage-9-voodoo-bone-market.png");
+    this.load.image("stageBackground10", "/assets/stage-10-heartroot-swamp.png");
     this.load.image("mvpSprites", "/assets/mvp-sprites.png");
     this.load.image("enemyTypes1", "/assets/enemy-types-1.png");
     this.load.image("enemyTypes2", "/assets/enemy-types-2.png");
     this.load.image("enemyTypes3", "/assets/enemy-types-3.png");
+    this.load.image("swampEnemies1", "/assets/swamp-enemies-1.png");
+    this.load.image("swampEnemies2", "/assets/swamp-enemies-2.png");
+    this.load.image("swampEnemies3", "/assets/swamp-enemies-3.png");
     this.load.image("bossTypes1", "/assets/boss-types-1.png");
     this.load.image("bossTypes2", "/assets/boss-types-2.png");
+    this.load.image("swampBosses1", "/assets/swamp-bosses-1.png");
+    this.load.image("swampBosses2", "/assets/swamp-bosses-2.png");
   }
 
   create() {
