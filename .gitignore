@@ -3,6 +3,7 @@ dist/
 .vercel/
 *.log
 *.local
+tmp/
 
 
 .vercel
