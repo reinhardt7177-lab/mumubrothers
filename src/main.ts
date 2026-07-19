@@ -34,12 +34,21 @@ function createShell() {
           </div>
         </div>
         <div id="kill-streak" class="kill-streak">DEADEYE <strong>x0</strong></div>
+        <button id="brother-tag" class="brother-hud" type="button" aria-label="Swap brother">
+          <span id="brother-name">BLUE / DEADEYE</span>
+          <i class="tag-track"><b id="tag-progress"></b></i>
+          <small id="weapon-name">PEACEMAKER</small>
+        </button>
+        <div id="event-banner" class="event-banner" aria-live="polite"></div>
+        <div id="hazard-overlay" class="hazard-overlay" aria-hidden="true"></div>
         <div id="damage-flash" class="damage-flash" aria-hidden="true"></div>
         <div id="status" class="status">DRAW!</div>
         <div id="shop" class="shop hidden">
           <div class="shop-window">
             <h2 id="shop-title">SHOP</h2>
             <p id="shop-gold">Gold 0</p>
+            <p id="shop-build" class="shop-build">NO SYNERGY - COMBINE MODS</p>
+            <div id="stage-report" class="stage-report" aria-live="polite"></div>
             <div class="shop-grid">
               <button id="buy-damage" type="button"><i class="item-icon shotgun"></i><span>Powder</span><small>Damage up</small></button>
               <button id="buy-range" type="button"><i class="item-icon rifle"></i><span>Barrel</span><small>Range up</small></button>
@@ -76,6 +85,7 @@ function createShell() {
             <button class="touch-btn touch-down" data-move="down" type="button" aria-label="Move down">&#9660;</button>
           </div>
           <div class="touch-actions" aria-label="Actions">
+            <button id="touch-tag" class="touch-action tag" type="button">TAG</button>
             <button id="touch-dynamite" class="touch-action dynamite" type="button">TNT</button>
           </div>
         </div>
@@ -87,6 +97,7 @@ function createShell() {
           <span>A/D or arrows</span><b>move</b>
           <span>Mouse</span><b>aim</b>
           <span>Tap target or Z/X/C/Space</span><b>fire</b>
+          <span>Q</span><b>tag</b>
           <span>F</span><b>dynamite</b>
           <span>R</span><b>restart</b>
         </div>
@@ -119,6 +130,7 @@ type Enemy = {
   sprite: Phaser.GameObjects.Container;
   body: Phaser.GameObjects.Rectangle;
   hp: number;
+  maxHp: number;
   speed: number;
   lane: number;
   nextShot: number;
@@ -132,10 +144,27 @@ type Enemy = {
   pattern: EnemyPattern;
   nextSpecial: number;
   goldValue: number;
+  bossPhase: 1 | 2;
+  weakUntil: number;
+  weakpoint?: Phaser.GameObjects.Arc;
+  bounty: boolean;
   alive: boolean;
 };
 
 type EnemyPattern = "shooter" | "charger" | "tank" | "skirmisher" | "trickster";
+type Brother = "blue" | "red";
+type EventKind = "wanted" | "ambush" | "goldRush" | "darkness" | "deadeye";
+type DamageSource = "shot" | "dynamite" | "assist" | "hazard" | "explosion";
+
+type StageReport = {
+  grade: "S" | "A" | "B" | "C";
+  accuracy: number;
+  maxCombo: number;
+  damageTaken: number;
+  clearTime: number;
+  eliteKills: number;
+  bonus: number;
+};
 
 type SpawnPoint = {
   x: number;
@@ -231,6 +260,8 @@ const WAVE_ACTS = [
   { numeral: "IV", name: "LAST STAND", cap: 12, spawnDelay: 350, callout: "LAST STAND" }
 ] as const;
 
+const STAGE_EVENTS: EventKind[] = ["wanted", "ambush", "goldRush", "darkness", "deadeye"];
+
 const STAGE_BACKGROUND_ASSETS = [
   ["stageBackground1", "/assets/mvp-background.png"],
   ["stageBackground2", "/assets/stage-2-red-mesa.png"],
@@ -285,6 +316,7 @@ const STAGES: StageTheme[] = [
 
 class MumuBrothersScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container;
+  private playerSprite!: Phaser.GameObjects.Image;
   private playerBody!: Phaser.GameObjects.Rectangle;
   private reticle!: Phaser.GameObjects.Container;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -322,6 +354,20 @@ class MumuBrothersScene extends Phaser.Scene {
   private waveAct = 1;
   private invulnerableUntil = 0;
   private continuesLeft = 3;
+  private activeBrother: Brother = "blue";
+  private tagMeter = 0;
+  private nextTag = 0;
+  private activeEvent?: { kind: EventKind; endsAt: number };
+  private nextHazard = 0;
+  private hazardZone?: { x: number; y: number; endsAt: number; nextDamage: number; sprite: Phaser.GameObjects.Arc };
+  private stageStartedAt = 0;
+  private shotsFired = 0;
+  private shotsHit = 0;
+  private stageDamageTaken = 0;
+  private stageMaxCombo = 0;
+  private stageEliteKills = 0;
+  private stageReport?: StageReport;
+  private runCompletePending = false;
   private scoreText!: HTMLElement;
   private waveText!: HTMLElement;
   private stageNameText!: HTMLElement;
@@ -333,16 +379,25 @@ class MumuBrothersScene extends Phaser.Scene {
   private killProgress!: HTMLElement;
   private dynamiteText!: HTMLElement;
   private killStreakText!: HTMLElement;
+  private brotherTagButton!: HTMLButtonElement;
+  private brotherNameText!: HTMLElement;
+  private tagProgress!: HTMLElement;
+  private weaponNameText!: HTMLElement;
+  private eventBanner!: HTMLElement;
+  private hazardOverlay!: HTMLElement;
   private damageFlash!: HTMLElement;
   private statusText!: HTMLElement;
   private statusTimer?: Phaser.Time.TimerEvent;
   private shopOverlay!: HTMLElement;
   private shopTitle!: HTMLElement;
   private shopGoldText!: HTMLElement;
+  private shopBuildText!: HTMLElement;
+  private stageReportText!: HTMLElement;
   private introOverlay!: HTMLElement;
   private startButton!: HTMLButtonElement;
   private chapterButtons: HTMLButtonElement[] = [];
   private touchDynamiteButton!: HTMLButtonElement;
+  private touchTagButton!: HTMLButtonElement;
   private buyDamageButton!: HTMLButtonElement;
   private buyRangeButton!: HTMLButtonElement;
   private buyReloadButton!: HTMLButtonElement;
@@ -358,6 +413,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private reticleHorizontal!: Phaser.GameObjects.Rectangle;
   private reticleVertical!: Phaser.GameObjects.Rectangle;
   private reticleLocked = false;
+  private reticleWeak = false;
 
   constructor() {
     super("mumu-brothers");
@@ -379,7 +435,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.createPlayer();
     this.createReticle();
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = this.input.keyboard!.addKeys("W,A,S,D,Z,X,C,F,SPACE,ENTER,R") as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys("W,A,S,D,Z,X,C,F,Q,SPACE,ENTER,R") as Record<string, Phaser.Input.Keyboard.Key>;
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => this.reticle.setPosition(pointer.x, pointer.y));
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       if (!this.gameStarted) return;
@@ -424,6 +480,7 @@ class MumuBrothersScene extends Phaser.Scene {
     }
     if (this.isPointerDown) this.shoot();
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.throwDynamite();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.Q)) this.swapBrother();
 
     const act = WAVE_ACTS[this.waveAct - 1];
     const activeCap = act.cap;
@@ -434,6 +491,7 @@ class MumuBrothersScene extends Phaser.Scene {
 
     this.updateEnemies(time, delta);
     this.updateBullets(delta);
+    this.updateStageSystems(time);
     this.updateReticleLock();
 
     if (!this.bossSpawned && this.stageKills >= this.killTarget) this.spawnBoss();
@@ -451,15 +509,24 @@ class MumuBrothersScene extends Phaser.Scene {
     this.killProgress = document.querySelector("#kill-progress")!;
     this.dynamiteText = document.querySelector("#dynamite-count")!;
     this.killStreakText = document.querySelector("#kill-streak")!;
+    this.brotherTagButton = document.querySelector("#brother-tag")!;
+    this.brotherNameText = document.querySelector("#brother-name")!;
+    this.tagProgress = document.querySelector("#tag-progress")!;
+    this.weaponNameText = document.querySelector("#weapon-name")!;
+    this.eventBanner = document.querySelector("#event-banner")!;
+    this.hazardOverlay = document.querySelector("#hazard-overlay")!;
     this.damageFlash = document.querySelector("#damage-flash")!;
     this.statusText = document.querySelector("#status")!;
     this.shopOverlay = document.querySelector("#shop")!;
     this.shopTitle = document.querySelector("#shop-title")!;
     this.shopGoldText = document.querySelector("#shop-gold")!;
+    this.shopBuildText = document.querySelector("#shop-build")!;
+    this.stageReportText = document.querySelector("#stage-report")!;
     this.introOverlay = document.querySelector("#intro")!;
     this.startButton = document.querySelector("#start-game")!;
     this.chapterButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-chapter]")];
     this.touchDynamiteButton = document.querySelector("#touch-dynamite")!;
+    this.touchTagButton = document.querySelector("#touch-tag")!;
     this.buyDamageButton = document.querySelector("#buy-damage")!;
     this.buyRangeButton = document.querySelector("#buy-range")!;
     this.buyReloadButton = document.querySelector("#buy-reload")!;
@@ -476,6 +543,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.buyPotionButton.addEventListener("click", () => this.buyShopItem("potion"));
     this.buyDynamiteButton.addEventListener("click", () => this.buyShopItem("dynamite"));
     this.continueButton.addEventListener("click", () => this.leaveShop());
+    this.brotherTagButton.addEventListener("click", () => this.swapBrother());
     this.startButton.addEventListener("click", () => this.startGame());
     this.chapterButtons.forEach((button) => {
       button.addEventListener("click", () => this.selectChapter(Number(button.dataset.chapter)));
@@ -513,11 +581,48 @@ class MumuBrothersScene extends Phaser.Scene {
       stopTouch(event);
       this.throwDynamite();
     });
+    this.touchTagButton.addEventListener("pointerdown", (event) => {
+      stopTouch(event);
+      this.swapBrother();
+    });
   }
 
   private updateTouchMove() {
     this.touchMove.x = Number(this.activeTouchMoves.has("right")) - Number(this.activeTouchMoves.has("left"));
     this.touchMove.y = Number(this.activeTouchMoves.has("down")) - Number(this.activeTouchMoves.has("up"));
+  }
+
+  private swapBrother() {
+    if (!this.gameStarted || this.inShop || this.isGameOver || this.time.now < this.nextTag) return;
+    this.nextTag = this.time.now + 850;
+    if (this.tagMeter >= 100) this.callBrotherAssist();
+    this.activeBrother = this.activeBrother === "blue" ? "red" : "blue";
+    this.playerSprite.setFrame(this.activeBrother === "blue" ? "heroBlue" : "heroRed");
+    this.playerSprite.setDisplaySize(104, 112);
+    this.cameras.main.flash(90, this.activeBrother === "blue" ? 70 : 190, 80, this.activeBrother === "blue" ? 210 : 60);
+    this.updateHud(this.activeBrother === "blue" ? "BLUE - DEADEYE" : "RED - BOOMSTICK");
+  }
+
+  private callBrotherAssist() {
+    const frame = this.activeBrother === "blue" ? "heroRed" : "heroBlue";
+    const support = this.sheetSprite(-90, 360, frame, 104, 112).setDepth(14);
+    this.tweens.add({
+      targets: support,
+      x: 1050,
+      duration: 820,
+      ease: "Cubic.easeInOut",
+      onUpdate: () => {
+        if (Phaser.Math.Between(0, 3) === 0) this.flash(support.x + 30, support.y - 20, 0xfff0a8);
+      },
+      onComplete: () => support.destroy()
+    });
+    for (const bullet of [...this.bullets]) this.destroyBullet(bullet);
+    for (const enemy of [...this.enemies]) {
+      if (enemy.alive) this.damageEnemy(enemy, enemy.isBoss ? 5 : 3, false, "assist");
+    }
+    this.tagMeter = 0;
+    this.cameras.main.shake(240, 0.009);
+    this.showStatus("BROTHER CROSSOVER!", "act", 1200);
   }
 
   private startGame() {
@@ -531,7 +636,14 @@ class MumuBrothersScene extends Phaser.Scene {
     this.introOverlay.classList.add("hidden");
     this.spawnWave();
     this.updateHud(this.stageTitle());
-    if (new URLSearchParams(window.location.search).get("shop") === "1") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("boss") === "1") {
+      this.stageKills = this.killTarget;
+      this.spawnBoss();
+    }
+    const requestedEvent = params.get("event") as EventKind | null;
+    if (requestedEvent && STAGE_EVENTS.includes(requestedEvent)) this.startStageEvent(requestedEvent);
+    if (params.get("shop") === "1") {
       this.gold = Math.max(this.gold, 30);
       this.openShop();
     }
@@ -723,8 +835,8 @@ class MumuBrothersScene extends Phaser.Scene {
     this.player = this.add.container(480, 442);
     this.player.setDepth(5);
     const shadow = this.add.ellipse(0, 30, 74, 18, 0x000000, 0.32);
-    const hero = this.sheetSprite(0, -20, "heroBlue", 104, 112);
-    this.player.add([shadow, hero]);
+    this.playerSprite = this.sheetSprite(0, -20, "heroBlue", 104, 112);
+    this.player.add([shadow, this.playerSprite]);
     this.playerBody = this.add.rectangle(480, 442, 48, 88, 0xffffff, 0).setDepth(5);
   }
 
@@ -743,10 +855,18 @@ class MumuBrothersScene extends Phaser.Scene {
     const locked = this.enemies.some(
       (enemy) => enemy.alive && Phaser.Geom.Intersects.RectangleToRectangle(aimArea, enemy.body.getBounds())
     );
-    if (locked === this.reticleLocked) return;
+    const weak = this.enemies.some(
+      (enemy) =>
+        enemy.alive &&
+        enemy.isBoss &&
+        this.time.now < enemy.weakUntil &&
+        Phaser.Math.Distance.Between(this.reticle.x, this.reticle.y, enemy.sprite.x, enemy.sprite.y - 72) <= radius + 30
+    );
+    if (locked === this.reticleLocked && weak === this.reticleWeak) return;
     this.reticleLocked = locked;
-    const color = locked ? 0xff5b3d : 0xf7e1a0;
-    this.reticleRing.setStrokeStyle(locked ? 3 : 2, color, 0.95);
+    this.reticleWeak = weak;
+    const color = weak ? 0x6fffe6 : locked ? 0xff5b3d : 0xf7e1a0;
+    this.reticleRing.setStrokeStyle(locked || weak ? 3 : 2, color, 0.95);
     this.reticleDot.setFillStyle(locked ? 0xffffff : color, 1);
     this.reticleHorizontal.setFillStyle(color, 0.9);
     this.reticleVertical.setFillStyle(color, 0.9);
@@ -787,8 +907,12 @@ class MumuBrothersScene extends Phaser.Scene {
       ? this.bossSprite(0, -58, bossFrame, bossWidth, bossHeight)
       : this.enemySprite(0, -24, enemyFrame, 100, 108);
     const aura = isElite ? this.add.ellipse(0, 22, 86, 28, 0xffd24c, 0.24).setBlendMode(Phaser.BlendModes.ADD) : undefined;
+    const weakpoint = isBoss
+      ? this.add.circle(0, -72, 22, 0x63ffe0, 0.2).setStrokeStyle(4, 0xbaffee, 1).setVisible(false).setDepth(8)
+      : undefined;
     if (isElite) sprite.setTint(0xffd36e);
     c.add(aura ? [shadow, aura, sprite] : [shadow, sprite]);
+    if (weakpoint) c.add(weakpoint);
     const body = this.add.rectangle(point.x, point.y, isBoss ? 90 : isElite ? 62 : 52, isBoss ? 130 : isElite ? 98 : 88, 0xffffff, 0).setDepth(4);
     const hp = isBoss ? 16 + this.wave * 7 : isElite ? 4 + Math.floor(this.wave / 2) : pattern === "tank" ? 2 : 1;
     const speed = this.enemySpeed(pattern, isBoss, isElite);
@@ -804,6 +928,7 @@ class MumuBrothersScene extends Phaser.Scene {
       sprite: c,
       body,
       hp,
+      maxHp: hp,
       speed,
       lane: point.y,
       nextShot: this.time.now + Phaser.Math.Between(isBoss ? 950 : 1500, isBoss ? 1800 : 3100),
@@ -817,6 +942,10 @@ class MumuBrothersScene extends Phaser.Scene {
       pattern,
       nextSpecial: this.time.now + Phaser.Math.Between(1200, 2600),
       goldValue: isBoss ? 10 : isElite ? 5 : 1,
+      bossPhase: 1,
+      weakUntil: 0,
+      weakpoint,
+      bounty: false,
       alive: true
     };
   }
@@ -840,16 +969,33 @@ class MumuBrothersScene extends Phaser.Scene {
     this.nextEliteKill = 25;
     this.killTarget = KILLS_TO_BOSS;
     this.nextSpawn = this.time.now + 360;
+    this.nextHazard = this.time.now + 12000;
+    this.activeEvent = undefined;
+    this.hazardZone?.sprite.destroy();
+    this.hazardZone = undefined;
+    this.eventBanner.className = "event-banner";
+    this.eventBanner.textContent = "";
+    this.hazardOverlay.className = "hazard-overlay";
+    this.stageStartedAt = this.time.now;
+    this.shotsFired = 0;
+    this.shotsHit = 0;
+    this.stageDamageTaken = 0;
+    this.stageMaxCombo = 0;
+    this.stageEliteKills = 0;
+    this.stageReport = undefined;
+    this.runCompletePending = false;
     const count = Math.min(5 + Math.floor(this.wave / 3), WAVE_ACTS[0].cap);
     for (let i = 0; i < count; i += 1) this.spawnEnemy();
   }
 
-  private spawnEnemy() {
+  private spawnEnemy(forceElite = false, bounty = false) {
     const point = this.pickOpenSpawnPoint();
     if (!point) return;
-    const isElite = !this.bossSpawned && this.stageKills >= this.nextEliteKill;
-    if (isElite) this.nextEliteKill += 25;
-    this.enemies.push(this.createEnemy(point, false, isElite));
+    const isElite = forceElite || (!this.bossSpawned && this.stageKills >= this.nextEliteKill);
+    if (isElite && !forceElite) this.nextEliteKill += 25;
+    const enemy = this.createEnemy(point, false, isElite);
+    enemy.bounty = bounty;
+    this.enemies.push(enemy);
     if (isElite) this.updateHud("ELITE OUTLAW!");
   }
 
@@ -908,17 +1054,29 @@ class MumuBrothersScene extends Phaser.Scene {
     if (this.isGameOver || this.inShop || this.time.now < this.nextPlayerShot) return;
     const weapon = this.weaponStats();
     this.nextPlayerShot = this.time.now + weapon.delay;
+    this.shotsFired += 1;
     const start = new Phaser.Math.Vector2(this.player.x, this.player.y - 18);
     const target = new Phaser.Math.Vector2(this.reticle.x, this.reticle.y);
     const direction = target.subtract(start).normalize();
     this.cameras.main.shake(weapon.shake, 0.0025);
     this.flash(start.x + direction.x * 34, start.y + direction.y * 34, 0xfff0a8);
     this.impactAt(this.reticle.x, this.reticle.y);
-    this.hitScanAt(this.reticle.x, this.reticle.y, weapon.damage, weapon.radius, weapon.pierce);
-    if (weapon.extraHits > 0) {
-      this.hitScanAt(this.reticle.x - weapon.radius * 0.9, this.reticle.y, weapon.damage, weapon.radius, weapon.pierce);
-      this.hitScanAt(this.reticle.x + weapon.radius * 0.9, this.reticle.y, weapon.damage, weapon.radius, weapon.pierce);
+    const critical = weapon.critChance > 0 && Math.random() < weapon.critChance;
+    const damage = critical ? weapon.damage * 2 : weapon.damage;
+    let hit = this.hitScanAt(this.reticle.x, this.reticle.y, damage, weapon.radius, weapon.pierce);
+    for (let index = 0; index < weapon.extraHits; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const lane = Math.floor(index / 2) + 1;
+      hit = this.hitScanAt(
+        this.reticle.x + side * weapon.radius * 0.72 * lane,
+        this.reticle.y,
+        damage,
+        weapon.radius,
+        weapon.pierce
+      ) || hit;
     }
+    if (hit) this.shotsHit += 1;
+    if (critical && hit) this.pop(this.reticle.x, this.reticle.y, "CRITICAL!");
   }
 
   private spawnBullet(x: number, y: number, vx: number, vy: number, fromPlayer: boolean) {
@@ -934,6 +1092,7 @@ class MumuBrothersScene extends Phaser.Scene {
       this.separateEnemy(enemy);
       enemy.body.setPosition(enemy.sprite.x, enemy.sprite.y);
       enemy.sprite.setScale(enemy.sprite.x < this.player.x ? 1 : -1, 1);
+      if (enemy.isBoss) this.updateBossPattern(enemy, time);
 
       if (
         time > enemy.nextShot &&
@@ -942,7 +1101,8 @@ class MumuBrothersScene extends Phaser.Scene {
         Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, this.player.x, this.player.y) < 640
       ) {
         const start = new Phaser.Math.Vector2(enemy.sprite.x, enemy.sprite.y - 18);
-        const spread = enemy.isBoss ? 10 : enemy.isElite ? 18 : 34;
+        const eventSpread = this.activeEvent?.kind === "darkness" ? 18 : 0;
+        const spread = (enemy.isBoss ? 10 : enemy.isElite ? 18 : 34) + eventSpread;
         const target = new Phaser.Math.Vector2(
           this.player.x + Phaser.Math.Between(-spread, spread),
           this.player.y - 14 + Phaser.Math.Between(-Math.floor(spread / 2), Math.floor(spread / 2))
@@ -962,6 +1122,32 @@ class MumuBrothersScene extends Phaser.Scene {
         this.nextEnemyShot = time + (enemy.isBoss ? 520 : enemy.isElite ? 680 : 860);
       }
     }
+  }
+
+  private updateBossPattern(enemy: Enemy, time: number) {
+    if (time <= enemy.nextSpecial) return;
+    enemy.nextSpecial = time + (enemy.bossPhase === 2 ? 3000 : 4200);
+    const warning = this.add.circle(enemy.sprite.x, enemy.sprite.y - 42, 32).setStrokeStyle(5, 0xff4438, 0.95).setDepth(13);
+    this.tweens.add({ targets: warning, scale: 2.1, alpha: 0.15, duration: 520, ease: "Quad.easeIn" });
+    this.time.delayedCall(520, () => {
+      warning.destroy();
+      if (!enemy.alive) return;
+      enemy.weakUntil = this.time.now + (enemy.bossPhase === 2 ? 1350 : 1750);
+      enemy.weakpoint?.setVisible(true);
+      this.pop(enemy.sprite.x, enemy.sprite.y - 90, "WEAKPOINT!");
+      const shots = enemy.bossPhase === 2 ? 5 : 3;
+      for (let index = 0; index < shots; index += 1) {
+        const start = new Phaser.Math.Vector2(enemy.sprite.x, enemy.sprite.y - 28);
+        const offset = (index - (shots - 1) / 2) * 62;
+        const target = new Phaser.Math.Vector2(this.player.x + offset, this.player.y - 12);
+        const direction = target.subtract(start).normalize();
+        const speed = 235 + this.wave * 5 + enemy.bossPhase * 20;
+        this.spawnBullet(start.x, start.y, direction.x * speed, direction.y * speed, false);
+      }
+      this.time.delayedCall(enemy.bossPhase === 2 ? 1350 : 1750, () => {
+        if (enemy.alive && this.time.now >= enemy.weakUntil) enemy.weakpoint?.setVisible(false);
+      });
+    });
   }
 
   private moveEnemy(enemy: Enemy, time: number, delta: number) {
@@ -1066,26 +1252,39 @@ class MumuBrothersScene extends Phaser.Scene {
     const blocker = this.firstPropOnLine(shotLine);
     if (blocker) {
       this.damageProp(blocker);
-      return;
+      return false;
     }
 
     const hitArea = new Phaser.Geom.Rectangle(x - radius, y - radius, radius * 2, radius * 2);
 
     const targets = this.enemies
-      .filter((enemy) => enemy.alive && Phaser.Geom.Intersects.RectangleToRectangle(hitArea, enemy.body.getBounds()))
+      .filter((enemy) => {
+        if (!enemy.alive) return false;
+        const bodyHit = Phaser.Geom.Intersects.RectangleToRectangle(hitArea, enemy.body.getBounds());
+        const weakHit =
+          enemy.isBoss &&
+          this.time.now < enemy.weakUntil &&
+          Phaser.Math.Distance.Between(x, y, enemy.sprite.x, enemy.sprite.y - 72) <= radius + 28;
+        return bodyHit || weakHit;
+      })
       .sort((a, b) => Phaser.Math.Distance.Between(x, y, a.sprite.x, a.sprite.y) - Phaser.Math.Distance.Between(x, y, b.sprite.x, b.sprite.y));
     if (targets.length > 0) {
       for (const enemy of targets.slice(0, pierce + 1)) {
-        this.damageEnemy(enemy, damage);
+        const weakHit =
+          enemy.isBoss &&
+          this.time.now < enemy.weakUntil &&
+          Phaser.Math.Distance.Between(x, y, enemy.sprite.x, enemy.sprite.y - 72) <= radius + 28;
+        this.damageEnemy(enemy, damage, weakHit, "shot");
       }
-      return;
+      return true;
     }
 
     for (const prop of [...this.props]) {
       if (!Phaser.Geom.Intersects.RectangleToRectangle(hitArea, prop.body.getBounds())) continue;
       this.damageProp(prop);
-      return;
+      return false;
     }
+    return false;
   }
 
   private firstPropOnLine(line: Phaser.Geom.Line) {
@@ -1117,25 +1316,36 @@ class MumuBrothersScene extends Phaser.Scene {
     }
   }
 
-  private damageEnemy(enemy: Enemy, damage: number) {
-    enemy.hp -= damage;
+  private damageEnemy(enemy: Enemy, damage: number, weakHit = false, source: DamageSource = "shot") {
+    if (!enemy.alive) return;
+    const resolvedDamage = weakHit ? Math.ceil(damage * (this.activeBrother === "blue" ? 2.5 : 2)) : damage;
+    enemy.hp -= resolvedDamage;
     this.flash(enemy.sprite.x, enemy.sprite.y - 20, 0xfff0a8);
     this.tintContainer(enemy.sprite, 0xffe0a0);
     this.time.delayedCall(70, () => this.clearContainerTint(enemy.sprite));
     if (enemy.hp > 0) {
-      if (enemy.isBoss) this.pop(enemy.sprite.x, enemy.sprite.y - 82, `${enemy.hp}`);
+      if (enemy.isBoss && enemy.bossPhase === 1 && enemy.hp <= enemy.maxHp / 2) this.enterBossPhaseTwo(enemy);
+      if (enemy.isBoss) this.pop(enemy.sprite.x, enemy.sprite.y - 82, weakHit ? `WEAK -${resolvedDamage}` : `${enemy.hp}`);
+      this.updateHud();
       return;
     }
 
     enemy.alive = false;
     this.combo += 1;
+    this.stageMaxCombo = Math.max(this.stageMaxCombo, this.combo);
     this.score += enemy.isBoss ? 1000 + this.wave * 250 : 80 * this.combo;
-    this.gold += enemy.goldValue;
+    const goldRush = this.activeEvent?.kind === "goldRush" && this.time.now < this.activeEvent.endsAt;
+    const bountyBonus = enemy.bounty && this.activeEvent?.kind === "wanted" ? 10 : 0;
+    const fuseBonus = source === "dynamite" && this.gunDamageLevel >= 3 ? 1 : 0;
+    const earnedGold = enemy.goldValue * (goldRush ? 2 : 1) + bountyBonus + fuseBonus;
+    this.gold += earnedGold;
     if (!enemy.isBoss) {
       this.stageKills += 1;
+      if (enemy.isElite) this.stageEliteKills += 1;
+      this.tagMeter = Phaser.Math.Clamp(this.tagMeter + (enemy.isElite ? 22 : 9), 0, 100);
       this.updateWaveAct();
     }
-    this.pop(enemy.sprite.x, enemy.sprite.y, enemy.isBoss ? `+${enemy.goldValue}G BOSS` : enemy.isElite ? `+${enemy.goldValue}G ELITE` : "+1G");
+    this.pop(enemy.sprite.x, enemy.sprite.y, enemy.isBoss ? `+${earnedGold}G BOSS` : enemy.isElite ? `+${earnedGold}G ELITE` : `+${earnedGold}G`);
     this.explode(enemy.sprite.x, enemy.sprite.y);
     enemy.body.destroy();
     this.cameras.main.shake(enemy.isBoss ? 280 : 70, enemy.isBoss ? 0.008 : 0.0015);
@@ -1148,31 +1358,58 @@ class MumuBrothersScene extends Phaser.Scene {
       ease: "Quad.easeOut",
       onComplete: () => enemy.sprite.destroy()
     });
+
+    if (source === "shot" && this.weaponStats().explosive && !enemy.isBoss) {
+      const nearby = this.enemies.filter(
+        (other) => other.alive && other !== enemy && Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, other.sprite.x, other.sprite.y) < 118
+      );
+      for (const other of nearby.slice(0, 3)) this.damageEnemy(other, 1, false, "explosion");
+    }
     this.updateHud();
 
     if (enemy.isBoss) this.finishStage();
   }
 
+  private enterBossPhaseTwo(enemy: Enemy) {
+    enemy.bossPhase = 2;
+    enemy.speed *= 1.35;
+    enemy.nextShot = this.time.now + 400;
+    enemy.nextSpecial = this.time.now + 900;
+    enemy.weakUntil = this.time.now + 1500;
+    enemy.weakpoint?.setVisible(true);
+    const flash = this.add.rectangle(480, 270, 960, 540, this.currentTheme().accent, 0.22).setDepth(18);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 560, onComplete: () => flash.destroy() });
+    this.cameras.main.shake(440, 0.014);
+    this.showStatus("PHASE II - RAGE", "boss", 1500);
+  }
+
   private finishStage() {
+    this.stageReport = this.buildStageReport();
+    this.gold += this.stageReport.bonus;
     this.clearCombat();
-    if (this.wave >= STAGES.length) {
-      this.isGameOver = true;
-      this.updateHud("CLEAR! R TO RESTART");
-      this.statusText.classList.add("large");
-      return;
-    }
+    this.runCompletePending = this.wave >= STAGES.length;
     this.openShop();
   }
 
   private openShop() {
     this.inShop = true;
     this.shopOverlay.classList.remove("hidden");
-    this.shopTitle.textContent = `GUNSMITH - STAGE ${this.wave} CLEAR`;
+    this.shopTitle.textContent = this.runCompletePending ? "RUN COMPLETE" : `GUNSMITH - STAGE ${this.wave} CLEAR`;
+    this.continueButton.textContent = this.runCompletePending ? "Finish Run" : "Next Stage";
+    this.renderStageReport();
     this.updateShop();
   }
 
   private leaveShop() {
     if (!this.inShop || this.loadingChapter) return;
+    if (this.runCompletePending) {
+      this.inShop = false;
+      this.shopOverlay.classList.add("hidden");
+      this.isGameOver = true;
+      this.statusText.classList.add("large");
+      this.updateHud("RUN CLEAR - R TO RESTART");
+      return;
+    }
     const nextStage = this.wave + 1;
     this.ensureChapterLoaded(this.chapterForStage(nextStage), () => {
       this.inShop = false;
@@ -1182,6 +1419,37 @@ class MumuBrothersScene extends Phaser.Scene {
       this.spawnWave();
       this.updateHud(this.stageTitle());
     });
+  }
+
+  private buildStageReport(): StageReport {
+    const accuracy = this.shotsFired > 0 ? Math.round((this.shotsHit / this.shotsFired) * 100) : 0;
+    const clearTime = Math.max(1, Math.round((this.time.now - this.stageStartedAt) / 1000));
+    let points = accuracy >= 75 ? 2 : accuracy >= 55 ? 1 : 0;
+    points += this.stageMaxCombo >= 30 ? 2 : this.stageMaxCombo >= 12 ? 1 : 0;
+    points += this.stageDamageTaken === 0 ? 2 : this.stageDamageTaken <= 2 ? 1 : 0;
+    points += clearTime <= 150 ? 2 : clearTime <= 210 ? 1 : 0;
+    points += this.stageEliteKills >= 3 ? 2 : this.stageEliteKills >= 1 ? 1 : 0;
+    const grade: StageReport["grade"] = points >= 9 ? "S" : points >= 7 ? "A" : points >= 5 ? "B" : "C";
+    const bonus = { S: 15, A: 10, B: 6, C: 2 }[grade];
+    return { grade, accuracy, maxCombo: this.stageMaxCombo, damageTaken: this.stageDamageTaken, clearTime, eliteKills: this.stageEliteKills, bonus };
+  }
+
+  private renderStageReport() {
+    if (!this.stageReport) {
+      this.stageReportText.classList.add("empty");
+      this.stageReportText.textContent = "BUILD YOUR NEXT WEAPON";
+      return;
+    }
+    const report = this.stageReport;
+    this.stageReportText.classList.remove("empty");
+    this.stageReportText.innerHTML = `
+      <strong class="grade grade-${report.grade.toLowerCase()}">${report.grade}</strong>
+      <span><b>${report.accuracy}%</b><small>ACCURACY</small></span>
+      <span><b>x${report.maxCombo}</b><small>MAX COMBO</small></span>
+      <span><b>${report.damageTaken}</b><small>DAMAGE</small></span>
+      <span><b>${report.clearTime}s</b><small>TIME</small></span>
+      <span><b>${report.eliteKills}</b><small>ELITES</small></span>
+      <em>+${report.bonus}G</em>`;
   }
 
   private buyShopItem(kind: "damage" | "range" | "reload" | "pierce" | "life" | "potion" | "dynamite") {
@@ -1221,7 +1489,8 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private updateShop() {
-    this.shopGoldText.textContent = `Gold ${this.gold} | Revolver DMG ${this.gunDamageLevel} RNG ${this.gunRangeLevel} REL ${this.gunReloadLevel} PRC ${this.gunPierceLevel} | Life ${this.lives}/${this.maxLives}`;
+    this.shopGoldText.textContent = `Gold ${this.gold} | ${this.weaponName()} | DMG ${this.gunDamageLevel} RNG ${this.gunRangeLevel} REL ${this.gunReloadLevel} PRC ${this.gunPierceLevel}`;
+    this.shopBuildText.textContent = this.synergySummary();
     this.buyDamageButton.innerHTML = this.upgradeHtml("shotgun", "Powder", "damage", `Damage +1`);
     this.buyRangeButton.innerHTML = this.upgradeHtml("rifle", "Long Barrel", "range", `Hit range +10`);
     this.buyReloadButton.innerHTML = this.upgradeHtml("gatling", "Quick Trigger", "reload", `Reload -32ms`);
@@ -1266,14 +1535,37 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private weaponStats() {
+    const blue = this.activeBrother === "blue";
+    const deadeye = this.activeEvent?.kind === "deadeye";
+    const wideBore = this.gunRangeLevel >= 2 && this.gunDamageLevel >= 1;
     return {
-      damage: 1 + this.gunDamageLevel,
-      radius: 28 + this.gunRangeLevel * 10,
-      delay: Math.max(90, 210 - this.gunReloadLevel * 32),
-      extraHits: 0,
-      pierce: this.gunPierceLevel,
-      shake: Math.max(18, 45 - this.gunReloadLevel * 3)
+      damage: 1 + this.gunDamageLevel + (blue ? 0 : 1),
+      radius: 28 + this.gunRangeLevel * 10 + (blue ? 0 : 14),
+      delay: Math.round(Math.max(72, 210 - this.gunReloadLevel * 27) * (blue ? 0.76 : 1.24) * (deadeye ? 0.72 : 1)),
+      extraHits: (blue ? 0 : 2) + (wideBore ? 2 : 0),
+      pierce: this.gunPierceLevel + (deadeye ? 2 : 0),
+      shake: Math.max(18, 45 - this.gunReloadLevel * 3),
+      critChance: this.gunDamageLevel >= 2 && this.gunReloadLevel >= 2 ? 0.2 : blue ? 0.06 : 0,
+      explosive: this.gunDamageLevel >= 2 && this.gunPierceLevel >= 1
     };
+  }
+
+  private weaponName() {
+    if (this.gunDamageLevel >= 2 && this.gunPierceLevel >= 1) return this.activeBrother === "blue" ? "DYNAMO REPEATER" : "THUNDER BORE";
+    if (this.gunDamageLevel >= 2 && this.gunReloadLevel >= 2) return "GUNSLINGER CLOCK";
+    if (this.gunRangeLevel >= 2 && this.gunDamageLevel >= 1) return "WIDE BORE";
+    const total = this.gunDamageLevel + this.gunRangeLevel + this.gunReloadLevel + this.gunPierceLevel;
+    if (total >= 6) return this.activeBrother === "blue" ? "BRASS VIPER" : "BOOMSTICK MK II";
+    return this.activeBrother === "blue" ? "PEACEMAKER" : "SCATTERGUN";
+  }
+
+  private synergySummary() {
+    const synergies: string[] = [];
+    if (this.gunDamageLevel >= 2 && this.gunPierceLevel >= 1) synergies.push("DYNAMO ROUNDS");
+    if (this.gunDamageLevel >= 2 && this.gunReloadLevel >= 2) synergies.push("GUNSLINGER CLOCK");
+    if (this.gunRangeLevel >= 2 && this.gunDamageLevel >= 1) synergies.push("WIDE BORE");
+    if (this.gunDamageLevel >= 3 && this.dynamite > 0) synergies.push("GOLDEN FUSE");
+    return synergies.length > 0 ? `SYNERGIES: ${synergies.join(" + ")}` : "NO SYNERGY - COMBINE MODS";
   }
 
   private throwDynamite() {
@@ -1284,7 +1576,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.dynamite -= 1;
     const liveEnemies = this.enemies.filter((enemy) => enemy.alive);
     for (const enemy of liveEnemies) {
-      this.damageEnemy(enemy, 999);
+      this.damageEnemy(enemy, enemy.isBoss ? Math.ceil(enemy.maxHp * 0.28) : 999, false, "dynamite");
     }
     this.cameras.main.shake(420, 0.018);
     this.updateHud("DYNAMITE!");
@@ -1292,6 +1584,7 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private damagePlayer() {
     this.lives -= 1;
+    this.stageDamageTaken += 1;
     this.combo = 0;
     this.invulnerableUntil = this.time.now + 2100;
     this.damageFlash.classList.remove("show");
@@ -1308,10 +1601,27 @@ class MumuBrothersScene extends Phaser.Scene {
       onComplete: () => this.player.setAlpha(1)
     });
     if (this.lives <= 0) {
-      this.offerContinue();
+      if (this.tagMeter >= 50) {
+        this.brotherRescue();
+      } else {
+        this.offerContinue();
+      }
     } else {
       this.updateHud();
     }
+  }
+
+  private brotherRescue() {
+    this.tagMeter = 0;
+    this.activeBrother = this.activeBrother === "blue" ? "red" : "blue";
+    this.playerSprite.setFrame(this.activeBrother === "blue" ? "heroBlue" : "heroRed").setDisplaySize(104, 112);
+    this.lives = Math.max(2, Math.ceil(this.maxLives / 2));
+    this.invulnerableUntil = this.time.now + 3500;
+    for (const bullet of [...this.bullets]) this.destroyBullet(bullet);
+    this.player.setAlpha(1);
+    this.cameras.main.flash(240, 245, 192, 82);
+    this.showStatus("BROTHER RESCUE!", "boss", 1500);
+    this.updateHud();
   }
 
   private offerContinue() {
@@ -1410,7 +1720,7 @@ class MumuBrothersScene extends Phaser.Scene {
     const label = this.add
       .text(x, y - 50, text, {
         color: "#ffe6a3",
-        fontFamily: "Arial, sans-serif",
+        fontFamily: "Courier New, monospace",
         fontSize: "20px",
         fontStyle: "bold",
         stroke: "#2a1711",
@@ -1423,7 +1733,12 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private updateHud(status?: string) {
     const act = WAVE_ACTS[this.waveAct - 1];
-    const progress = this.bossSpawned ? 100 : Phaser.Math.Clamp((this.stageKills / this.killTarget) * 100, 0, 100);
+    const boss = this.enemies.find((enemy) => enemy.alive && enemy.isBoss);
+    const progress = boss
+      ? Phaser.Math.Clamp((boss.hp / boss.maxHp) * 100, 0, 100)
+      : this.bossSpawned
+        ? 0
+        : Phaser.Math.Clamp((this.stageKills / this.killTarget) * 100, 0, 100);
     const remaining = Math.max(0, this.killTarget - this.stageKills);
     this.scoreText.textContent = this.score.toLocaleString("en-US");
     this.waveText.textContent = String(this.wave);
@@ -1435,12 +1750,22 @@ class MumuBrothersScene extends Phaser.Scene {
     this.goldText.textContent = String(this.gold);
     this.dynamiteText.textContent = `x${this.dynamite}`;
     this.comboText.textContent = this.bossSpawned ? this.currentTheme().bossName ?? "BOSS" : `${this.stageKills} / ${this.killTarget}`;
-    this.bossDistanceText.textContent = this.bossSpawned ? "BOSS ENGAGED" : `BOSS IN ${remaining}`;
-    this.wavePhaseText.textContent = this.bossSpawned ? "FINAL DUEL" : `${act.numeral} / ${act.name}`;
+    this.bossDistanceText.textContent = boss
+      ? `PHASE ${boss.bossPhase} - ${this.time.now < boss.weakUntil ? "WEAKPOINT OPEN" : "READ THE TELL"}`
+      : this.bossSpawned
+        ? "BOSS DOWN"
+        : `BOSS IN ${remaining}`;
+    this.wavePhaseText.textContent = boss ? `HP ${Math.max(0, boss.hp)} / ${boss.maxHp}` : this.bossSpawned ? "FINAL DUEL" : `${act.numeral} / ${act.name}`;
     this.killProgress.style.width = `${progress}%`;
     this.killProgress.classList.toggle("boss", this.bossSpawned);
     this.killStreakText.innerHTML = `DEADEYE <strong>x${this.combo}</strong>`;
     this.killStreakText.classList.toggle("show", this.combo >= 3 && !this.inShop && !this.isGameOver);
+    this.brotherNameText.textContent = this.activeBrother === "blue" ? "BLUE / DEADEYE" : "RED / BOOMSTICK";
+    this.tagProgress.style.width = `${this.tagMeter}%`;
+    this.weaponNameText.textContent = this.weaponName();
+    this.brotherTagButton.classList.toggle("red", this.activeBrother === "red");
+    this.brotherTagButton.classList.toggle("ready", this.tagMeter >= 100);
+    this.touchTagButton.classList.toggle("ready", this.tagMeter >= 100);
     if (this.inShop) this.updateShop();
     if (status) this.showStatus(status);
   }
@@ -1520,6 +1845,150 @@ class MumuBrothersScene extends Phaser.Scene {
     this.waveAct = nextAct;
     const act = WAVE_ACTS[this.waveAct - 1];
     this.showStatus(`ACT ${act.numeral} - ${act.callout}`, "act", 1500);
+    this.startStageEvent();
+  }
+
+  private startStageEvent(forcedKind?: EventKind) {
+    if (this.activeEvent?.kind === "darkness") this.hazardOverlay.classList.remove("show", "darkness");
+    const kind = forcedKind ?? STAGE_EVENTS[(this.wave + this.waveAct - 2) % STAGE_EVENTS.length];
+    const labels: Record<EventKind, string> = {
+      wanted: "WANTED - 10G BOUNTY",
+      ambush: "AMBUSH - SURROUNDED",
+      goldRush: "GOLD RUSH - DOUBLE GOLD",
+      darkness: "BLACKOUT - ENEMY AIM SHAKEN",
+      deadeye: "DEAD EYE - RAPID PIERCE"
+    };
+    this.activeEvent = { kind, endsAt: this.time.now + (kind === "wanted" ? 14000 : 10500) };
+    this.eventBanner.textContent = labels[kind];
+    this.eventBanner.className = `event-banner show ${kind}`;
+    if (kind === "wanted") {
+      this.time.delayedCall(350, () => {
+        if (!this.inShop && !this.bossSpawned && this.activeEvent?.kind === "wanted") this.spawnEnemy(true, true);
+      });
+    }
+    if (kind === "ambush") {
+      for (let index = 0; index < 5; index += 1) {
+        this.time.delayedCall(index * 180, () => {
+          if (!this.inShop && !this.bossSpawned && this.activeEvent?.kind === "ambush") this.spawnEnemy(index === 4);
+        });
+      }
+    }
+    if (kind === "darkness") this.hazardOverlay.classList.add("show", "darkness");
+    this.updateHud();
+  }
+
+  private updateStageSystems(time: number) {
+    if (this.activeEvent && time >= this.activeEvent.endsAt) {
+      const wasDark = this.activeEvent.kind === "darkness";
+      this.activeEvent = undefined;
+      this.eventBanner.className = "event-banner";
+      this.eventBanner.textContent = "";
+      if (wasDark) this.hazardOverlay.classList.remove("show", "darkness");
+      this.updateHud();
+    }
+    if (this.hazardZone) {
+      if (time >= this.hazardZone.endsAt) {
+        this.hazardZone.sprite.destroy();
+        this.hazardZone = undefined;
+      } else if (
+        time >= this.hazardZone.nextDamage &&
+        Phaser.Math.Distance.Between(this.player.x, this.player.y, this.hazardZone.x, this.hazardZone.y) < 88 &&
+        time > this.invulnerableUntil
+      ) {
+        this.hazardZone.nextDamage = time + 1200;
+        this.damagePlayer();
+      }
+    }
+    if (time >= this.nextHazard) {
+      this.nextHazard = time + (this.bossSpawned ? 10500 : 15500);
+      this.triggerStageHazard();
+    }
+  }
+
+  private triggerStageHazard() {
+    const hazard = ["crossfire", "sandstorm", "train", "blast", "hellfire", "poison", "lightning", "fog", "hex", "roots"][(this.wave - 1) % 10];
+    if (hazard === "sandstorm" || hazard === "fog") {
+      this.hazardOverlay.classList.add("show", hazard);
+      this.showStatus(hazard === "sandstorm" ? "MESA SANDSTORM" : "RIVER FOG", "minor", 1100);
+      this.time.delayedCall(4200, () => this.hazardOverlay.classList.remove("show", hazard));
+      return;
+    }
+    if (hazard === "poison" || hazard === "roots") {
+      this.createHazardZone(hazard === "poison" ? 0x4cff72 : 0x9dff6a, hazard === "poison" ? "POISON BLOOM" : "HEARTROOT RISES");
+      return;
+    }
+    if (hazard === "train") {
+      const warning = this.add.rectangle(480, 348, 960, 76, 0xff5a36, 0.2).setDepth(7);
+      this.showStatus("IRON BELLE EXPRESS", "minor", 1000);
+      this.tweens.add({ targets: warning, alpha: 0.55, yoyo: true, repeat: 3, duration: 140 });
+      this.time.delayedCall(950, () => {
+        warning.destroy();
+        if (this.inShop || this.isGameOver) return;
+        const train = this.add.rectangle(-220, 348, 420, 84, 0x2c2420, 0.96).setStrokeStyle(5, 0xe7b34e).setDepth(12);
+        this.tweens.add({ targets: train, x: 1180, duration: 850, onComplete: () => train.destroy() });
+        for (const enemy of [...this.enemies]) if (enemy.alive && enemy.sprite.y > 320) this.damageEnemy(enemy, 3, false, "hazard");
+        if (this.player.y < 425 && this.time.now > this.invulnerableUntil) this.damagePlayer();
+      });
+      return;
+    }
+    if (hazard === "blast" || hazard === "hellfire") {
+      this.blastHazard(hazard === "hellfire" ? 0xff4c32 : 0xffbc4f, hazard === "hellfire" ? "HELLFIRE" : "MINE BLAST");
+      return;
+    }
+    const color = hazard === "lightning" ? 0x7bfff2 : hazard === "hex" ? 0xc178ff : hazard === "hellfire" ? 0xff4c32 : 0xffbc4f;
+    this.strikeHazard(color, hazard === "lightning" ? "BAYOU LIGHTNING" : hazard === "hex" ? "VOODOO HEX" : "CROSSFIRE");
+  }
+
+  private blastHazard(color: number, label: string) {
+    const x = Phaser.Math.Between(150, 810);
+    const y = Phaser.Math.Between(380, 452);
+    const warning = this.add.circle(x, y, 28, color, 0.12).setStrokeStyle(5, color, 0.9).setDepth(12);
+    this.showStatus(label, "minor", 900);
+    this.tweens.add({ targets: warning, scale: 3.2, alpha: 0.55, duration: 760 });
+    this.time.delayedCall(760, () => {
+      warning.destroy();
+      if (this.inShop || this.isGameOver) return;
+      this.explode(x, y);
+      const radius = 112;
+      for (const enemy of [...this.enemies]) {
+        if (enemy.alive && Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, x, y) < radius) this.damageEnemy(enemy, 3, false, "hazard");
+      }
+      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y) < radius && this.time.now > this.invulnerableUntil) this.damagePlayer();
+      this.cameras.main.shake(240, 0.01);
+    });
+  }
+
+  private strikeHazard(color: number, label: string) {
+    const x = Phaser.Math.Between(130, 830);
+    const warning = this.add.rectangle(x, 280, 48, 520, color, 0.14).setDepth(11);
+    this.showStatus(label, "minor", 950);
+    this.tweens.add({ targets: warning, alpha: 0.52, yoyo: true, repeat: 3, duration: 120 });
+    this.time.delayedCall(760, () => {
+      warning.destroy();
+      if (this.inShop || this.isGameOver) return;
+      const strike = this.add.rectangle(x, 280, 26, 520, color, 0.95).setBlendMode(Phaser.BlendModes.ADD).setDepth(14);
+      this.tweens.add({ targets: strike, alpha: 0, scaleX: 3.2, duration: 260, onComplete: () => strike.destroy() });
+      for (const enemy of [...this.enemies]) if (enemy.alive && Math.abs(enemy.sprite.x - x) < 68) this.damageEnemy(enemy, 2, false, "hazard");
+      if (Math.abs(this.player.x - x) < 48 && this.time.now > this.invulnerableUntil) this.damagePlayer();
+    });
+  }
+
+  private createHazardZone(color: number, label: string) {
+    const x = Phaser.Math.Between(170, 790);
+    const y = 442;
+    const warning = this.add.circle(x, y, 28, color, 0.12).setStrokeStyle(4, color, 0.85).setDepth(4);
+    this.showStatus(label, "minor", 1000);
+    this.tweens.add({ targets: warning, scale: 3, alpha: 0.42, duration: 720 });
+    this.time.delayedCall(720, () => {
+      warning.destroy();
+      if (this.inShop || this.isGameOver) return;
+      const zone = this.add.circle(x, y, 88, color, 0.24).setStrokeStyle(3, color, 0.65).setDepth(3);
+      this.hazardZone?.sprite.destroy();
+      this.hazardZone = { x, y, endsAt: this.time.now + 5200, nextDamage: this.time.now + 650, sprite: zone };
+      for (const enemy of [...this.enemies]) {
+        if (enemy.alive && Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, x, y) < 108) this.damageEnemy(enemy, 1, false, "hazard");
+      }
+    });
   }
 
   private enemyPattern(frameName: keyof typeof ENEMY_SPRITES): EnemyPattern {
@@ -1572,6 +2041,7 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private clearCombat() {
     this.enemies.forEach((enemy) => {
+      enemy.alive = false;
       enemy.sprite.destroy();
       enemy.body.destroy();
     });
