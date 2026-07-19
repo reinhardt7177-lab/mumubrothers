@@ -7,12 +7,34 @@ function createShell() {
       <section class="stage-wrap">
         <div id="game" class="game"></div>
         <div class="hud">
-          <div><span>SCORE</span><strong id="score">0</strong></div>
-          <div><span>STAGE</span><strong id="wave">1</strong></div>
-          <div><span>LIVES</span><strong id="lives">5</strong></div>
-          <div><span>GOLD</span><strong id="gold">0</strong></div>
-          <div><span>KILLS</span><strong id="combo">0/100</strong></div>
+          <div class="hud-meta">
+            <div class="hud-stat"><span>SCORE</span><strong id="score">0</strong></div>
+            <div class="hud-stat hud-gold"><span>GOLD</span><strong id="gold">0</strong></div>
+          </div>
+          <div class="hud-progress">
+            <div class="stage-line">
+              <span class="stage-badge">STAGE <strong id="wave">1</strong></span>
+              <strong id="stage-name" class="stage-name">Dustbell Main</strong>
+              <span id="wave-phase" class="wave-phase">I / SCOUT</span>
+            </div>
+            <div class="kill-track" aria-label="Boss progress">
+              <i id="kill-progress"></i>
+              <b class="kill-mark mark-25"></b>
+              <b class="kill-mark mark-50"></b>
+              <b class="kill-mark mark-75"></b>
+            </div>
+            <div class="progress-line">
+              <strong id="boss-distance">BOSS IN 100</strong>
+              <span id="combo">0 / 100</span>
+            </div>
+          </div>
+          <div class="hud-vitals">
+            <div class="hud-stat hud-lives"><span>GRIT</span><strong id="lives">5/5</strong></div>
+            <div class="hud-stat hud-bombs"><span>TNT</span><strong id="dynamite-count">0</strong></div>
+          </div>
         </div>
+        <div id="kill-streak" class="kill-streak">DEADEYE <strong>x0</strong></div>
+        <div id="damage-flash" class="damage-flash" aria-hidden="true"></div>
         <div id="status" class="status">DRAW!</div>
         <div id="shop" class="shop hidden">
           <div class="shop-window">
@@ -48,13 +70,13 @@ function createShell() {
         </div>
         <div class="touch-controls" aria-label="Touch controls">
           <div class="touch-pad" aria-label="Move">
-            <button class="touch-btn touch-up" data-move="up" type="button" aria-label="Move up">U</button>
-            <button class="touch-btn touch-left" data-move="left" type="button" aria-label="Move left">L</button>
-            <button class="touch-btn touch-right" data-move="right" type="button" aria-label="Move right">R</button>
-            <button class="touch-btn touch-down" data-move="down" type="button" aria-label="Move down">D</button>
+            <button class="touch-btn touch-up" data-move="up" type="button" aria-label="Move up">&#9650;</button>
+            <button class="touch-btn touch-left" data-move="left" type="button" aria-label="Move left">&#9664;</button>
+            <button class="touch-btn touch-right" data-move="right" type="button" aria-label="Move right">&#9654;</button>
+            <button class="touch-btn touch-down" data-move="down" type="button" aria-label="Move down">&#9660;</button>
           </div>
           <div class="touch-actions" aria-label="Actions">
-            <button id="touch-dynamite" class="touch-action dynamite" type="button">BOMB</button>
+            <button id="touch-dynamite" class="touch-action dynamite" type="button">TNT</button>
           </div>
         </div>
       </section>
@@ -137,8 +159,6 @@ type Bullet = {
   life: number;
 };
 
-type WeaponKind = "pistol" | "shotgun" | "rifle" | "gatling";
-
 const SPRITES = {
   heroRed: { x: 42, y: 42, w: 285, h: 282 },
   heroBlue: { x: 374, y: 38, w: 290, h: 288 },
@@ -167,16 +187,16 @@ const ENEMY_SPRITES = {
   armoredSheriff: { texture: "enemyTypes2", x: 585, y: 552, w: 366, h: 432 },
   vampireCowboy: { texture: "enemyTypes3", x: 87, y: 50, w: 338, h: 412 },
   demonOutlaw: { texture: "enemyTypes3", x: 603, y: 28, w: 330, h: 456 },
-  swampZombie: { texture: "swampEnemies1", x: 16, y: 147, w: 423, h: 560 },
-  gatorOutlaw: { texture: "swampEnemies1", x: 443, y: 160, w: 444, h: 541 },
-  poisonFrog: { texture: "swampEnemies1", x: 887, y: 189, w: 443, h: 505 },
-  wispGunslinger: { texture: "swampEnemies1", x: 1330, y: 153, w: 421, h: 554 },
-  voodooMask: { texture: "swampEnemies2", x: 9, y: 114, w: 434, h: 613 },
-  skeletalFerryman: { texture: "swampEnemies2", x: 443, y: 152, w: 444, h: 579 },
-  leechMutant: { texture: "swampEnemies2", x: 887, y: 161, w: 443, h: 561 },
-  mossWitch: { texture: "swampEnemies2", x: 1330, y: 129, w: 430, h: 590 },
-  mosquitoGunslinger: { texture: "swampEnemies3", x: 39, y: 121, w: 848, h: 632 },
-  boneAlligator: { texture: "swampEnemies3", x: 887, y: 165, w: 883, h: 568 }
+  swampZombie: { texture: "swampZombie", x: 0, y: 0, w: 395, h: 530 },
+  gatorOutlaw: { texture: "gatorOutlaw", x: 0, y: 0, w: 402, h: 512 },
+  poisonFrog: { texture: "poisonFrog", x: 0, y: 0, w: 401, h: 390 },
+  wispGunslinger: { texture: "wispGunslinger", x: 0, y: 0, w: 448, h: 527 },
+  voodooMask: { texture: "voodooMask", x: 0, y: 0, w: 437, h: 582 },
+  skeletalFerryman: { texture: "skeletalFerryman", x: 0, y: 0, w: 446, h: 547 },
+  leechMutant: { texture: "leechMutant", x: 0, y: 0, w: 415, h: 518 },
+  mossWitch: { texture: "mossWitch", x: 0, y: 0, w: 467, h: 565 },
+  mosquitoGunslinger: { texture: "mosquitoGunslinger", x: 0, y: 0, w: 704, h: 601 },
+  boneAlligator: { texture: "boneAlligator", x: 0, y: 0, w: 963, h: 537 }
 };
 
 const BOSS_SPRITES = {
@@ -185,11 +205,11 @@ const BOSS_SPRITES = {
   ironBelle: { texture: "bossTypes1", x: 1182, y: 121, w: 588, h: 629 },
   coalBaron: { texture: "bossTypes2", x: 90, y: 118, w: 678, h: 757 },
   lastBrother: { texture: "bossTypes2", x: 768, y: 77, w: 696, h: 814 },
-  gatorKing: { texture: "swampBosses1", x: 3, y: 43, w: 588, h: 768 },
-  candleWitch: { texture: "swampBosses1", x: 591, y: 35, w: 591, h: 782 },
-  steamboatRevenant: { texture: "swampBosses1", x: 1182, y: 100, w: 560, h: 711 },
-  boneMarketBaron: { texture: "swampBosses2", x: 0, y: 52, w: 858, h: 807 },
-  heartrootLeviathan: { texture: "swampBosses2", x: 858, y: 6, w: 822, h: 892 }
+  gatorKing: { texture: "gatorKing", x: 0, y: 0, w: 695, h: 737 },
+  candleWitch: { texture: "candleWitch", x: 0, y: 0, w: 582, h: 759 },
+  steamboatRevenant: { texture: "steamboatRevenant", x: 0, y: 0, w: 551, h: 684 },
+  boneMarketBaron: { texture: "boneMarketBaron", x: 0, y: 0, w: 808, h: 776 },
+  heartrootLeviathan: { texture: "heartrootLeviathan", x: 0, y: 0, w: 891, h: 863 }
 };
 
 const SPAWN_POINTS: SpawnPoint[] = [
@@ -204,6 +224,51 @@ const SPAWN_POINTS: SpawnPoint[] = [
 ];
 
 const KILLS_TO_BOSS = 100;
+const WAVE_ACTS = [
+  { numeral: "I", name: "SCOUT", cap: 7, spawnDelay: 760, callout: "THE HUNT BEGINS" },
+  { numeral: "II", name: "CROSSFIRE", cap: 9, spawnDelay: 590, callout: "CROSSFIRE" },
+  { numeral: "III", name: "ELITE HUNT", cap: 11, spawnDelay: 460, callout: "ELITES ON THE TRAIL" },
+  { numeral: "IV", name: "LAST STAND", cap: 12, spawnDelay: 350, callout: "LAST STAND" }
+] as const;
+
+const STAGE_BACKGROUND_ASSETS = [
+  ["stageBackground1", "/assets/mvp-background.png"],
+  ["stageBackground2", "/assets/stage-2-red-mesa.png"],
+  ["stageBackground3", "/assets/stage-3-coyote-rail.png"],
+  ["stageBackground4", "/assets/stage-4-black-spur-mine.png"],
+  ["stageBackground5", "/assets/stage-5-boss-town.png"],
+  ["stageBackground6", "/assets/stage-6-cursed-swamp-outpost.png"],
+  ["stageBackground7", "/assets/stage-7-witchfire-bayou.png"],
+  ["stageBackground8", "/assets/stage-8-steamboat-graveyard.png"],
+  ["stageBackground9", "/assets/stage-9-voodoo-bone-market.png"],
+  ["stageBackground10", "/assets/stage-10-heartroot-swamp.png"]
+] as const;
+
+const CHAPTER_ONE_SPRITE_ASSETS = [
+  ["enemyTypes1", "/assets/enemy-types-1.png"],
+  ["enemyTypes2", "/assets/enemy-types-2.png"],
+  ["enemyTypes3", "/assets/enemy-types-3.png"],
+  ["bossTypes1", "/assets/boss-types-1.png"],
+  ["bossTypes2", "/assets/boss-types-2.png"]
+] as const;
+
+const CHAPTER_TWO_SPRITE_ASSETS = [
+  ["swampZombie", "/assets/monsters/swamp-zombie.png"],
+  ["gatorOutlaw", "/assets/monsters/gator-outlaw.png"],
+  ["poisonFrog", "/assets/monsters/poison-frog.png"],
+  ["wispGunslinger", "/assets/monsters/wisp-gunslinger.png"],
+  ["voodooMask", "/assets/monsters/voodoo-mask.png"],
+  ["skeletalFerryman", "/assets/monsters/skeletal-ferryman.png"],
+  ["leechMutant", "/assets/monsters/leech-mutant.png"],
+  ["mossWitch", "/assets/monsters/moss-witch.png"],
+  ["mosquitoGunslinger", "/assets/monsters/mosquito-gunslinger.png"],
+  ["boneAlligator", "/assets/monsters/bone-alligator.png"],
+  ["gatorKing", "/assets/bosses/gator-king.png"],
+  ["candleWitch", "/assets/bosses/candle-witch.png"],
+  ["steamboatRevenant", "/assets/bosses/steamboat-revenant.png"],
+  ["boneMarketBaron", "/assets/bosses/bone-market-baron.png"],
+  ["heartrootLeviathan", "/assets/bosses/heartroot-leviathan.png"]
+] as const;
 
 const STAGES: StageTheme[] = [
   { name: "Dustbell Main", skyTop: 0x35201a, skyBottom: 0xb86b32, ground: 0xb36c32, trim: 0xf2c66b, accent: 0xa7472e, signs: ["SALOON", "BANK", "HOTEL"], prop: "barrel", motif: "town", bossName: "Marshal Bragg", enemyTint: 0xffffff, bossTint: 0xffc45f, wash: 0.03, background: "stageBackground1", enemyPool: ["maskedOutlaw", "rifleDesperado"], bossEnemy: "armoredSheriff", bossSprite: "marshalBragg" },
@@ -239,8 +304,8 @@ class MumuBrothersScene extends Phaser.Scene {
   private bossSpawned = false;
   private gameStarted = false;
   private inShop = false;
-  private weapon: WeaponKind = "pistol";
-  private gatlingAmmo = 0;
+  private loadingChapter = false;
+  private loadedChapters = new Set<number>();
   private dynamite = 0;
   private gunDamageLevel = 0;
   private gunRangeLevel = 0;
@@ -253,15 +318,24 @@ class MumuBrothersScene extends Phaser.Scene {
   private nextPlayerShot = 0;
   private nextEnemyShot = 0;
   private nextSpawn = 0;
-  private nextEliteKill = 20;
+  private nextEliteKill = 25;
+  private waveAct = 1;
   private invulnerableUntil = 0;
   private continuesLeft = 3;
   private scoreText!: HTMLElement;
   private waveText!: HTMLElement;
+  private stageNameText!: HTMLElement;
   private livesText!: HTMLElement;
   private goldText!: HTMLElement;
   private comboText!: HTMLElement;
+  private bossDistanceText!: HTMLElement;
+  private wavePhaseText!: HTMLElement;
+  private killProgress!: HTMLElement;
+  private dynamiteText!: HTMLElement;
+  private killStreakText!: HTMLElement;
+  private damageFlash!: HTMLElement;
   private statusText!: HTMLElement;
+  private statusTimer?: Phaser.Time.TimerEvent;
   private shopOverlay!: HTMLElement;
   private shopTitle!: HTMLElement;
   private shopGoldText!: HTMLElement;
@@ -279,33 +353,21 @@ class MumuBrothersScene extends Phaser.Scene {
   private continueButton!: HTMLButtonElement;
   private isGameOver = false;
   private waitingForContinue = false;
+  private reticleRing!: Phaser.GameObjects.Arc;
+  private reticleDot!: Phaser.GameObjects.Arc;
+  private reticleHorizontal!: Phaser.GameObjects.Rectangle;
+  private reticleVertical!: Phaser.GameObjects.Rectangle;
+  private reticleLocked = false;
 
   constructor() {
     super("mumu-brothers");
   }
 
   preload() {
-    this.load.image("stageBackground1", "/assets/mvp-background.png");
-    this.load.image("stageBackground2", "/assets/stage-2-red-mesa.png");
-    this.load.image("stageBackground3", "/assets/stage-3-coyote-rail.png");
-    this.load.image("stageBackground4", "/assets/stage-4-black-spur-mine.png");
-    this.load.image("stageBackground5", "/assets/stage-5-boss-town.png");
-    this.load.image("stageBackground6", "/assets/stage-6-cursed-swamp-outpost.png");
-    this.load.image("stageBackground7", "/assets/stage-7-witchfire-bayou.png");
-    this.load.image("stageBackground8", "/assets/stage-8-steamboat-graveyard.png");
-    this.load.image("stageBackground9", "/assets/stage-9-voodoo-bone-market.png");
-    this.load.image("stageBackground10", "/assets/stage-10-heartroot-swamp.png");
     this.load.image("mvpSprites", "/assets/mvp-sprites.png");
-    this.load.image("enemyTypes1", "/assets/enemy-types-1.png");
-    this.load.image("enemyTypes2", "/assets/enemy-types-2.png");
-    this.load.image("enemyTypes3", "/assets/enemy-types-3.png");
-    this.load.image("swampEnemies1", "/assets/swamp-enemies-1.png");
-    this.load.image("swampEnemies2", "/assets/swamp-enemies-2.png");
-    this.load.image("swampEnemies3", "/assets/swamp-enemies-3.png");
-    this.load.image("bossTypes1", "/assets/boss-types-1.png");
-    this.load.image("bossTypes2", "/assets/boss-types-2.png");
-    this.load.image("swampBosses1", "/assets/swamp-bosses-1.png");
-    this.load.image("swampBosses2", "/assets/swamp-bosses-2.png");
+    const initialStage = this.startStageFromParams();
+    const [backgroundKey, backgroundPath] = STAGE_BACKGROUND_ASSETS[initialStage - 1];
+    this.load.image(backgroundKey, backgroundPath);
   }
 
   create() {
@@ -363,14 +425,16 @@ class MumuBrothersScene extends Phaser.Scene {
     if (this.isPointerDown) this.shoot();
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.throwDynamite();
 
-    const activeCap = this.bossSpawned ? 10 : Math.min(20 + this.wave * 3, 38);
-    if (time > this.nextSpawn && this.enemies.filter((enemy) => enemy.alive).length < activeCap) {
+    const act = WAVE_ACTS[this.waveAct - 1];
+    const activeCap = act.cap;
+    if (!this.bossSpawned && time > this.nextSpawn && this.enemies.filter((enemy) => enemy.alive).length < activeCap) {
       this.spawnEnemy();
-      this.nextSpawn = time + Math.max(140, 360 - this.wave * 22);
+      this.nextSpawn = time + Math.max(280, act.spawnDelay - this.wave * 12);
     }
 
     this.updateEnemies(time, delta);
     this.updateBullets(delta);
+    this.updateReticleLock();
 
     if (!this.bossSpawned && this.stageKills >= this.killTarget) this.spawnBoss();
   }
@@ -378,9 +442,16 @@ class MumuBrothersScene extends Phaser.Scene {
   private createHud() {
     this.scoreText = document.querySelector("#score")!;
     this.waveText = document.querySelector("#wave")!;
+    this.stageNameText = document.querySelector("#stage-name")!;
     this.livesText = document.querySelector("#lives")!;
     this.goldText = document.querySelector("#gold")!;
     this.comboText = document.querySelector("#combo")!;
+    this.bossDistanceText = document.querySelector("#boss-distance")!;
+    this.wavePhaseText = document.querySelector("#wave-phase")!;
+    this.killProgress = document.querySelector("#kill-progress")!;
+    this.dynamiteText = document.querySelector("#dynamite-count")!;
+    this.killStreakText = document.querySelector("#kill-streak")!;
+    this.damageFlash = document.querySelector("#damage-flash")!;
     this.statusText = document.querySelector("#status")!;
     this.shopOverlay = document.querySelector("#shop")!;
     this.shopTitle = document.querySelector("#shop-title")!;
@@ -413,6 +484,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.statusText.addEventListener("click", () => {
       if (this.waitingForContinue) this.continueGame();
     });
+    this.damageFlash.addEventListener("animationend", () => this.damageFlash.classList.remove("show"));
     this.bindTouchControls();
   }
 
@@ -449,7 +521,12 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private startGame() {
-    if (this.gameStarted) return;
+    if (this.gameStarted || this.loadingChapter) return;
+    const chapter = this.chapterForStage(this.wave);
+    this.ensureChapterLoaded(chapter, () => this.beginGame());
+  }
+
+  private beginGame() {
     this.gameStarted = true;
     this.introOverlay.classList.add("hidden");
     this.spawnWave();
@@ -475,9 +552,51 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private applyStartParams() {
+    this.wave = this.startStageFromParams();
+  }
+
+  private startStageFromParams() {
     const stage = Number(new URLSearchParams(window.location.search).get("stage"));
-    if (Number.isFinite(stage) && stage >= 1) {
-      this.wave = Phaser.Math.Clamp(Math.floor(stage), 1, STAGES.length);
+    return Number.isFinite(stage) && stage >= 1 ? Phaser.Math.Clamp(Math.floor(stage), 1, STAGES.length) : 1;
+  }
+
+  private chapterForStage(stage: number) {
+    return stage >= 6 ? 2 : 1;
+  }
+
+  private ensureChapterLoaded(chapter: number, onComplete: () => void) {
+    if (this.loadedChapters.has(chapter)) {
+      onComplete();
+      return;
+    }
+
+    this.loadingChapter = true;
+    this.startButton.disabled = true;
+    this.continueButton.disabled = true;
+    const previousStartLabel = this.startButton.textContent;
+    const previousContinueLabel = this.continueButton.textContent;
+    this.startButton.textContent = `LOADING CHAPTER ${chapter}`;
+    this.continueButton.textContent = `LOADING CHAPTER ${chapter}`;
+    this.updateHud(`LOADING CHAPTER ${chapter}`);
+    this.queueChapterAssets(chapter);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.loadedChapters.add(chapter);
+      this.loadingChapter = false;
+      this.registerSpriteFrames();
+      this.startButton.disabled = false;
+      this.continueButton.disabled = false;
+      this.startButton.textContent = previousStartLabel;
+      this.continueButton.textContent = previousContinueLabel;
+      onComplete();
+    });
+    this.load.start();
+  }
+
+  private queueChapterAssets(chapter: number) {
+    const stageAssets = chapter === 2 ? STAGE_BACKGROUND_ASSETS.slice(5) : STAGE_BACKGROUND_ASSETS.slice(0, 5);
+    const spriteAssets = chapter === 2 ? CHAPTER_TWO_SPRITE_ASSETS : CHAPTER_ONE_SPRITE_ASSETS;
+    for (const [key, assetPath] of [...stageAssets, ...spriteAssets]) {
+      if (!this.textures.exists(key)) this.load.image(key, assetPath);
     }
   }
 
@@ -499,26 +618,13 @@ class MumuBrothersScene extends Phaser.Scene {
       lane.strokeRect(x, 468, 32, 5);
     }
 
-    this.track(
-      this.add
-        .text(480, 322, `${String(this.wave).padStart(2, "0")}  ${theme.name}`, {
-          color: "#ffe9b0",
-          fontFamily: "Georgia, serif",
-          fontSize: "18px",
-          fontStyle: "bold",
-          stroke: "#20100d",
-          strokeThickness: 4
-        })
-        .setOrigin(0.5)
-    );
-
     [
       [104, 418],
       [154, 420],
       [804, 412],
       [852, 420],
-      [486, 406],
-      [538, 408]
+      [350, 406],
+      [610, 408]
     ].forEach(([x, y], index) => this.createProp(x, y, index));
   }
 
@@ -624,11 +730,27 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private createReticle() {
     this.reticle = this.add.container(480, 260).setDepth(20);
-    const ring = this.add.circle(0, 0, 18).setStrokeStyle(2, 0xf7e1a0, 0.9);
-    const dot = this.add.circle(0, 0, 3, 0xffffff, 0.95);
-    const h = this.add.rectangle(0, 0, 34, 2, 0xf7e1a0, 0.8);
-    const v = this.add.rectangle(0, 0, 2, 34, 0xf7e1a0, 0.8);
-    this.reticle.add([ring, h, v, dot]);
+    this.reticleRing = this.add.circle(0, 0, 18).setStrokeStyle(2, 0xf7e1a0, 0.9);
+    this.reticleDot = this.add.circle(0, 0, 3, 0xffffff, 0.95);
+    this.reticleHorizontal = this.add.rectangle(0, 0, 34, 2, 0xf7e1a0, 0.8);
+    this.reticleVertical = this.add.rectangle(0, 0, 2, 34, 0xf7e1a0, 0.8);
+    this.reticle.add([this.reticleRing, this.reticleHorizontal, this.reticleVertical, this.reticleDot]);
+  }
+
+  private updateReticleLock() {
+    const radius = this.weaponStats().radius;
+    const aimArea = new Phaser.Geom.Rectangle(this.reticle.x - radius, this.reticle.y - radius, radius * 2, radius * 2);
+    const locked = this.enemies.some(
+      (enemy) => enemy.alive && Phaser.Geom.Intersects.RectangleToRectangle(aimArea, enemy.body.getBounds())
+    );
+    if (locked === this.reticleLocked) return;
+    this.reticleLocked = locked;
+    const color = locked ? 0xff5b3d : 0xf7e1a0;
+    this.reticleRing.setStrokeStyle(locked ? 3 : 2, color, 0.95);
+    this.reticleDot.setFillStyle(locked ? 0xffffff : color, 1);
+    this.reticleHorizontal.setFillStyle(color, 0.9);
+    this.reticleVertical.setFillStyle(color, 0.9);
+    this.reticle.setScale(locked ? 0.88 : 1);
   }
 
   private createProp(x: number, y: number, index: number) {
@@ -709,36 +831,53 @@ class MumuBrothersScene extends Phaser.Scene {
       this.playerBody.setDepth(5);
       this.reticle.setDepth(20);
     }
-    this.nextEnemyShot = this.time.now + 1200;
-    this.invulnerableUntil = this.time.now + 2200;
-    if (new URLSearchParams(window.location.search).has("stage")) {
-      this.invulnerableUntil = this.time.now + 8000;
-      this.lives = Math.max(this.lives, this.maxLives);
-    }
+    this.nextEnemyShot = this.time.now + 2600;
+    this.invulnerableUntil = this.time.now + 5000;
+    this.lives = Math.max(this.lives, this.maxLives);
     this.stageKills = 0;
     this.bossSpawned = false;
-    this.nextEliteKill = 20;
+    this.waveAct = 1;
+    this.nextEliteKill = 25;
     this.killTarget = KILLS_TO_BOSS;
     this.nextSpawn = this.time.now + 360;
-    const count = Math.min(10 + this.wave * 2, 18);
+    const count = Math.min(5 + Math.floor(this.wave / 3), WAVE_ACTS[0].cap);
     for (let i = 0; i < count; i += 1) this.spawnEnemy();
   }
 
   private spawnEnemy() {
-    const occupied = new Set(
-      this.enemies
-        .filter((enemy) => enemy.alive)
-        .map((enemy) => Math.round(enemy.coverY / 10) * 10 + ":" + Math.round(enemy.sprite.x / 80))
-    );
-    const candidates = SPAWN_POINTS.filter((point) => !occupied.has(Math.round(point.y / 10) * 10 + ":" + Math.round(point.x / 80)));
-    const point = Phaser.Utils.Array.GetRandom(candidates.length ? candidates : SPAWN_POINTS);
+    const point = this.pickOpenSpawnPoint();
+    if (!point) return;
     const isElite = !this.bossSpawned && this.stageKills >= this.nextEliteKill;
-    if (isElite) this.nextEliteKill += 20;
+    if (isElite) this.nextEliteKill += 25;
     this.enemies.push(this.createEnemy(point, false, isElite));
     if (isElite) this.updateHud("ELITE OUTLAW!");
   }
 
+  private pickOpenSpawnPoint() {
+    const liveEnemies = this.enemies.filter((enemy) => enemy.alive);
+    const shuffled = Phaser.Utils.Array.Shuffle([...SPAWN_POINTS]);
+    for (const base of shuffled) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const point = {
+          ...base,
+          x: Phaser.Math.Between(base.minX + 28, base.maxX - 28),
+          y: Phaser.Math.Clamp(base.y + Phaser.Math.Between(-18, 18), 238, 366)
+        };
+        if (this.positionHasRoom(point.x, point.y, undefined, 126, 82)) return point;
+      }
+    }
+    return undefined;
+  }
+
+  private positionHasRoom(x: number, y: number, ignored?: Enemy, horizontalGap = 96, verticalGap = 54) {
+    return this.enemies.every((enemy) => {
+      if (!enemy.alive || enemy === ignored) return true;
+      return Math.abs(enemy.sprite.x - x) > horizontalGap || Math.abs(enemy.sprite.y - y) > verticalGap;
+    });
+  }
+
   private spawnBoss() {
+    this.clearCombat();
     this.bossSpawned = true;
     const point: SpawnPoint = { x: 480, y: 286, minX: 300, maxX: 680, kind: "street" };
     const boss = this.createEnemy(point, true);
@@ -769,14 +908,6 @@ class MumuBrothersScene extends Phaser.Scene {
     if (this.isGameOver || this.inShop || this.time.now < this.nextPlayerShot) return;
     const weapon = this.weaponStats();
     this.nextPlayerShot = this.time.now + weapon.delay;
-    if (this.weapon === "gatling") {
-      this.gatlingAmmo -= 1;
-      if (this.gatlingAmmo <= 0) {
-        this.weapon = "pistol";
-        this.gatlingAmmo = 0;
-        this.updateHud("GATLING EMPTY");
-      }
-    }
     const start = new Phaser.Math.Vector2(this.player.x, this.player.y - 18);
     const target = new Phaser.Math.Vector2(this.reticle.x, this.reticle.y);
     const direction = target.subtract(start).normalize();
@@ -800,6 +931,7 @@ class MumuBrothersScene extends Phaser.Scene {
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
       this.moveEnemy(enemy, time, delta);
+      this.separateEnemy(enemy);
       enemy.body.setPosition(enemy.sprite.x, enemy.sprite.y);
       enemy.sprite.setScale(enemy.sprite.x < this.player.x ? 1 : -1, 1);
 
@@ -810,7 +942,11 @@ class MumuBrothersScene extends Phaser.Scene {
         Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, this.player.x, this.player.y) < 640
       ) {
         const start = new Phaser.Math.Vector2(enemy.sprite.x, enemy.sprite.y - 18);
-        const target = new Phaser.Math.Vector2(this.player.x, this.player.y - 14);
+        const spread = enemy.isBoss ? 10 : enemy.isElite ? 18 : 34;
+        const target = new Phaser.Math.Vector2(
+          this.player.x + Phaser.Math.Between(-spread, spread),
+          this.player.y - 14 + Phaser.Math.Between(-Math.floor(spread / 2), Math.floor(spread / 2))
+        );
         const direction = target.subtract(start).normalize();
         this.tweens.add({
           targets: enemy.sprite,
@@ -819,11 +955,11 @@ class MumuBrothersScene extends Phaser.Scene {
           duration: 95,
           ease: "Quad.easeOut"
         });
-        const bulletSpeed = enemy.isBoss ? 285 + this.wave * 8 : enemy.isElite ? 285 + this.wave * 7 : 245 + this.wave * 6;
+        const bulletSpeed = enemy.isBoss ? 260 + this.wave * 5 : enemy.isElite ? 245 + this.wave * 4 : 210 + this.wave * 4;
         this.spawnBullet(start.x, start.y, direction.x * bulletSpeed, direction.y * bulletSpeed, false);
         this.flash(start.x + direction.x * 24, start.y + direction.y * 24, enemy.isBoss ? 0xffd24c : 0xff6048);
         enemy.nextShot = time + this.enemyShotDelay(enemy);
-        this.nextEnemyShot = time + (enemy.isBoss ? 240 : enemy.isElite ? 280 : 360);
+        this.nextEnemyShot = time + (enemy.isBoss ? 520 : enemy.isElite ? 680 : 860);
       }
     }
   }
@@ -831,8 +967,14 @@ class MumuBrothersScene extends Phaser.Scene {
   private moveEnemy(enemy: Enemy, time: number, delta: number) {
     if (enemy.pattern === "trickster" && !enemy.isBoss && time > enemy.nextSpecial) {
       enemy.sprite.alpha = 0.35;
-      enemy.sprite.x = Phaser.Math.Between(enemy.minX, enemy.maxX);
-      enemy.coverY = Phaser.Math.Clamp(enemy.coverY + Phaser.Math.Between(-42, 42), 238, 370);
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const nextX = Phaser.Math.Between(enemy.minX, enemy.maxX);
+        const nextY = Phaser.Math.Clamp(enemy.coverY + Phaser.Math.Between(-42, 42), 238, 370);
+        if (!this.positionHasRoom(nextX, nextY, enemy, 120, 76)) continue;
+        enemy.sprite.x = nextX;
+        enemy.coverY = nextY;
+        break;
+      }
       this.tweens.add({ targets: enemy.sprite, alpha: 1, duration: 160, ease: "Quad.easeOut" });
       enemy.nextSpecial = time + Phaser.Math.Between(enemy.isElite ? 1400 : 2300, enemy.isElite ? 2400 : 3800);
     }
@@ -856,16 +998,28 @@ class MumuBrothersScene extends Phaser.Scene {
     enemy.sprite.y = Phaser.Math.Clamp(enemy.coverY + drift, 230, 382);
   }
 
+  private separateEnemy(enemy: Enemy) {
+    if (enemy.isBoss) return;
+    for (const other of this.enemies) {
+      if (!other.alive || other === enemy || other.isBoss) continue;
+      const dx = enemy.sprite.x - other.sprite.x;
+      const dy = enemy.sprite.y - other.sprite.y;
+      if (Math.abs(dx) >= 104 || Math.abs(dy) >= 68) continue;
+      const push = (104 - Math.abs(dx)) * 0.08;
+      enemy.sprite.x = Phaser.Math.Clamp(enemy.sprite.x + (dx >= 0 ? push : -push), enemy.minX, enemy.maxX);
+    }
+  }
+
   private enemyCanShoot(enemy: Enemy) {
-    return enemy.isBoss || enemy.isElite || enemy.pattern === "shooter" || enemy.pattern === "skirmisher" || enemy.pattern === "trickster";
+    return enemy.isBoss || enemy.pattern === "shooter" || enemy.pattern === "skirmisher" || enemy.pattern === "trickster";
   }
 
   private enemyShotDelay(enemy: Enemy) {
     if (enemy.isBoss) return Phaser.Math.Between(1250, 2100);
-    if (enemy.isElite) return Phaser.Math.Between(1150, 2050);
-    if (enemy.pattern === "shooter") return Phaser.Math.Between(1450, 2550);
-    if (enemy.pattern === "skirmisher") return Phaser.Math.Between(1750, 2900);
-    return Phaser.Math.Between(2100, 3400);
+    if (enemy.isElite) return Phaser.Math.Between(1900, 3000);
+    if (enemy.pattern === "shooter") return Phaser.Math.Between(2300, 3600);
+    if (enemy.pattern === "skirmisher") return Phaser.Math.Between(2700, 4100);
+    return Phaser.Math.Between(3000, 4500);
   }
 
   private updateBullets(delta: number) {
@@ -979,30 +1133,24 @@ class MumuBrothersScene extends Phaser.Scene {
     this.gold += enemy.goldValue;
     if (!enemy.isBoss) {
       this.stageKills += 1;
-      if (this.stageKills < this.killTarget && this.stageKills % 50 === 0) {
-        this.updateHud(`KILLS ${this.stageKills}/${this.killTarget}`);
-      }
+      this.updateWaveAct();
     }
     this.pop(enemy.sprite.x, enemy.sprite.y, enemy.isBoss ? `+${enemy.goldValue}G BOSS` : enemy.isElite ? `+${enemy.goldValue}G ELITE` : "+1G");
     this.explode(enemy.sprite.x, enemy.sprite.y);
-    enemy.sprite.destroy();
     enemy.body.destroy();
+    this.cameras.main.shake(enemy.isBoss ? 280 : 70, enemy.isBoss ? 0.008 : 0.0015);
+    this.tweens.add({
+      targets: enemy.sprite,
+      alpha: 0,
+      scale: enemy.isBoss ? 1.12 : 1.18,
+      y: enemy.sprite.y - 10,
+      duration: enemy.isBoss ? 240 : 110,
+      ease: "Quad.easeOut",
+      onComplete: () => enemy.sprite.destroy()
+    });
     this.updateHud();
 
     if (enemy.isBoss) this.finishStage();
-  }
-
-  private advanceStage() {
-    if (this.wave >= STAGES.length) {
-      this.isGameOver = true;
-      this.updateHud("CLEAR! R TO RESTART");
-      this.statusText.classList.add("large");
-      return;
-    }
-    this.wave += 1;
-    this.combo = 0;
-    this.spawnWave();
-    this.updateHud(this.stageTitle());
   }
 
   private finishStage() {
@@ -1024,13 +1172,16 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private leaveShop() {
-    if (!this.inShop) return;
-    this.inShop = false;
-    this.shopOverlay.classList.add("hidden");
-    this.wave += 1;
-    this.combo = 0;
-    this.spawnWave();
-    this.updateHud(this.stageTitle());
+    if (!this.inShop || this.loadingChapter) return;
+    const nextStage = this.wave + 1;
+    this.ensureChapterLoaded(this.chapterForStage(nextStage), () => {
+      this.inShop = false;
+      this.shopOverlay.classList.add("hidden");
+      this.wave = nextStage;
+      this.combo = 0;
+      this.spawnWave();
+      this.updateHud(this.stageTitle());
+    });
   }
 
   private buyShopItem(kind: "damage" | "range" | "reload" | "pierce" | "life" | "potion" | "dynamite") {
@@ -1143,13 +1294,23 @@ class MumuBrothersScene extends Phaser.Scene {
     this.lives -= 1;
     this.combo = 0;
     this.invulnerableUntil = this.time.now + 2100;
-    this.player.setAlpha(0.45);
+    this.damageFlash.classList.remove("show");
+    void this.damageFlash.offsetWidth;
+    this.damageFlash.classList.add("show");
+    this.player.setAlpha(0.62);
     this.cameras.main.shake(220, 0.01);
-    this.time.delayedCall(2100, () => this.player.setAlpha(1));
+    this.tweens.add({
+      targets: this.player,
+      alpha: 1,
+      duration: 100,
+      yoyo: true,
+      repeat: 7,
+      onComplete: () => this.player.setAlpha(1)
+    });
     if (this.lives <= 0) {
       this.offerContinue();
     } else {
-      this.updateHud("HIT!");
+      this.updateHud();
     }
   }
 
@@ -1261,19 +1422,39 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private updateHud(status?: string) {
-    this.scoreText.textContent = String(this.score);
+    const act = WAVE_ACTS[this.waveAct - 1];
+    const progress = this.bossSpawned ? 100 : Phaser.Math.Clamp((this.stageKills / this.killTarget) * 100, 0, 100);
+    const remaining = Math.max(0, this.killTarget - this.stageKills);
+    this.scoreText.textContent = this.score.toLocaleString("en-US");
     this.waveText.textContent = String(this.wave);
-    this.livesText.textContent = `${this.lives}/${this.maxLives}`;
+    this.stageNameText.textContent = this.currentTheme().name;
+    this.livesText.innerHTML = Array.from(
+      { length: this.maxLives },
+      (_, index) => `<i class="${index < this.lives ? "full" : ""}"></i>`
+    ).join("");
     this.goldText.textContent = String(this.gold);
-    this.comboText.textContent = this.bossSpawned ? "BOSS" : `${this.stageKills}/${this.killTarget}`;
+    this.dynamiteText.textContent = `x${this.dynamite}`;
+    this.comboText.textContent = this.bossSpawned ? this.currentTheme().bossName ?? "BOSS" : `${this.stageKills} / ${this.killTarget}`;
+    this.bossDistanceText.textContent = this.bossSpawned ? "BOSS ENGAGED" : `BOSS IN ${remaining}`;
+    this.wavePhaseText.textContent = this.bossSpawned ? "FINAL DUEL" : `${act.numeral} / ${act.name}`;
+    this.killProgress.style.width = `${progress}%`;
+    this.killProgress.classList.toggle("boss", this.bossSpawned);
+    this.killStreakText.innerHTML = `DEADEYE <strong>x${this.combo}</strong>`;
+    this.killStreakText.classList.toggle("show", this.combo >= 3 && !this.inShop && !this.isGameOver);
     if (this.inShop) this.updateShop();
-    if (status) {
-      this.statusText.textContent = status;
-      this.statusText.classList.add("show");
-      this.time.delayedCall(980, () => {
-        if (!this.isGameOver) this.statusText.classList.remove("show");
-      });
-    }
+    if (status) this.showStatus(status);
+  }
+
+  private showStatus(text: string, kind?: "stage" | "act" | "boss" | "minor", duration?: number) {
+    this.statusTimer?.remove(false);
+    const resolvedKind = kind ?? (text.startsWith("STAGE") ? "stage" : text.startsWith("BOSS") ? "boss" : "minor");
+    this.statusText.textContent = text;
+    this.statusText.classList.remove("stage", "act", "boss", "minor");
+    this.statusText.classList.add("show", resolvedKind);
+    const visibleFor = duration ?? (resolvedKind === "stage" ? 1800 : resolvedKind === "boss" ? 1600 : 980);
+    this.statusTimer = this.time.delayedCall(visibleFor, () => {
+      if (!this.isGameOver) this.statusText.classList.remove("show", "stage", "act", "boss", "minor");
+    });
   }
 
   private stageTitle() {
@@ -1292,12 +1473,14 @@ class MumuBrothersScene extends Phaser.Scene {
       }
     }
     for (const [name, frame] of Object.entries(ENEMY_SPRITES)) {
+      if (!this.textures.exists(frame.texture)) continue;
       const enemyTexture = this.textures.get(frame.texture);
       if (!enemyTexture.has(name)) {
         enemyTexture.add(name, 0, frame.x, frame.y, frame.w, frame.h);
       }
     }
     for (const [name, frame] of Object.entries(BOSS_SPRITES)) {
+      if (!this.textures.exists(frame.texture)) continue;
       const bossTexture = this.textures.get(frame.texture);
       if (!bossTexture.has(name)) {
         bossTexture.add(name, 0, frame.x, frame.y, frame.w, frame.h);
@@ -1325,9 +1508,18 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private pickEnemyFrame(isBoss: boolean) {
     const theme = this.currentTheme();
+    const availablePool = theme.enemyPool.slice(0, Phaser.Math.Clamp(this.waveAct + 1, 1, theme.enemyPool.length));
     return (isBoss
       ? theme.bossEnemy
-      : Phaser.Utils.Array.GetRandom(theme.enemyPool)) as keyof typeof ENEMY_SPRITES;
+      : Phaser.Utils.Array.GetRandom(availablePool)) as keyof typeof ENEMY_SPRITES;
+  }
+
+  private updateWaveAct() {
+    const nextAct = Phaser.Math.Clamp(Math.floor(this.stageKills / 25) + 1, 1, WAVE_ACTS.length);
+    if (nextAct === this.waveAct || this.stageKills >= this.killTarget) return;
+    this.waveAct = nextAct;
+    const act = WAVE_ACTS[this.waveAct - 1];
+    this.showStatus(`ACT ${act.numeral} - ${act.callout}`, "act", 1500);
   }
 
   private enemyPattern(frameName: keyof typeof ENEMY_SPRITES): EnemyPattern {

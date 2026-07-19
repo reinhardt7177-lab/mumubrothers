@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc && vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "validate-assets": "node scripts/validate-assets.mjs",
+    "check": "npm run validate-assets && npm run build"
   },
   "dependencies": {
     "phaser": "^3.90.0"
