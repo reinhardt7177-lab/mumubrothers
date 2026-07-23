@@ -11,7 +11,7 @@
     "check": "npm run validate-assets && npm run build"
   },
   "dependencies": {
-    "phaser": "^3.90.0"
+    "phaser": "^4.2.1"
   },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "^2.1.0",
