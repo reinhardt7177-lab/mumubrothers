@@ -21,6 +21,7 @@ export interface ScoreSubmission {
 export interface LeaderboardSnapshot {
   entries: LeaderboardEntry[];
   source: "online" | "local";
+  pendingSync: number;
 }
 
 const API_URL =
@@ -29,30 +30,35 @@ const GAME_ID = "mumu-brothers";
 const PLAYER_ID_KEY = "mumu-brothers-player-id-v1";
 const NICKNAME_KEY = "mumu-brothers-nickname-v1";
 const LOCAL_RANKING_KEY = "mumu-brothers-ranking-v1";
+const PENDING_SYNC_KEY = "mumu-brothers-ranking-pending-v1";
 const TOP_LIMIT = 10;
+const FETCH_LIMIT = 50;
 
 type LocalEntry = LeaderboardEntry & { playerId: string };
 
 export const isOnlineLeaderboardConfigured = API_URL.startsWith("https://script.google.com/");
 
 export function getLeaderboardNickname() {
-  const saved = localStorage.getItem(NICKNAME_KEY)?.trim();
-  return saved ? saved.slice(0, 12) : `꿈사수-${getPlayerId().slice(0, 4).toUpperCase()}`;
+  const saved = sanitizeNickname(localStorage.getItem(NICKNAME_KEY) || "");
+  return saved || generatedNickname();
 }
 
 export function saveLeaderboardNickname(value: string) {
-  const nickname = sanitizeNickname(value) || getLeaderboardNickname();
+  const nickname = sanitizeNickname(value) || generatedNickname();
   localStorage.setItem(NICKNAME_KEY, nickname);
   return nickname;
 }
 
-export async function loadLeaderboard(): Promise<LeaderboardSnapshot> {
+export async function loadLeaderboard(chapter = 1): Promise<LeaderboardSnapshot> {
+  const selectedChapter = normalizeChapter(chapter);
+  const pendingSync = await flushPendingEntries();
   if (isOnlineLeaderboardConfigured) {
     try {
       const query = new URLSearchParams({
         action: "top",
         gameId: GAME_ID,
-        limit: String(TOP_LIMIT)
+        chapter: String(selectedChapter),
+        limit: String(FETCH_LIMIT)
       });
       const response = await fetchWithTimeout(`${API_URL}?${query.toString()}`, {
         method: "GET",
@@ -63,14 +69,23 @@ export async function loadLeaderboard(): Promise<LeaderboardSnapshot> {
         throw new Error(payload.error || `랭킹 조회 실패: ${response.status}`);
       }
       return {
-        entries: payload.entries.map(normalizeEntry).filter((entry): entry is LeaderboardEntry => Boolean(entry)).slice(0, TOP_LIMIT),
-        source: "online"
+        entries: payload.entries
+          .map(normalizeEntry)
+          .filter((entry): entry is LeaderboardEntry => entry !== undefined && entry.chapter === selectedChapter)
+          .sort(compareEntries)
+          .slice(0, TOP_LIMIT),
+        source: "online",
+        pendingSync
       };
     } catch {
       // The local board remains usable when Apps Script is unavailable.
     }
   }
-  return { entries: readLocalEntries().slice(0, TOP_LIMIT), source: "local" };
+  return {
+    entries: readLocalEntries().filter((entry) => entry.chapter === selectedChapter).slice(0, TOP_LIMIT),
+    source: "local",
+    pendingSync
+  };
 }
 
 export async function submitLeaderboardScore(
@@ -90,52 +105,36 @@ export async function submitLeaderboardScore(
     recordedAt: new Date().toISOString()
   };
   saveLocalEntry(localEntry);
+  queuePendingEntry(localEntry);
 
   if (isOnlineLeaderboardConfigured) {
-    try {
-      const response = await fetchWithTimeout(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=UTF-8" },
-        body: JSON.stringify({
-          gameId: GAME_ID,
-          playerId: localEntry.playerId,
-          nickname,
-          record: {
-            score: localEntry.score,
-            stage: localEntry.stage,
-            chapter: localEntry.chapter,
-            grade: localEntry.grade,
-            cleared: localEntry.cleared,
-            elapsedMs: localEntry.elapsedMs
-          }
-        })
-      });
-      const payload = await response.json() as { ok?: boolean; error?: string };
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || `랭킹 등록 실패: ${response.status}`);
-      }
-      return loadLeaderboard();
-    } catch {
-      // The score is already preserved locally and can still be shown to the player.
-    }
+    const pendingSync = await flushPendingEntries();
+    if (pendingSync === 0) return loadLeaderboard(localEntry.chapter);
   }
-  return { entries: readLocalEntries().slice(0, TOP_LIMIT), source: "local" };
+  const pendingSync = readPendingEntries().length;
+  return {
+    entries: readLocalEntries().filter((entry) => entry.chapter === localEntry.chapter).slice(0, TOP_LIMIT),
+    source: "local",
+    pendingSync
+  };
 }
 
 function getPlayerId() {
   const saved = localStorage.getItem(PLAYER_ID_KEY);
   if (saved) return saved;
-  const created = crypto.randomUUID();
+  const created = createPlayerId();
   localStorage.setItem(PLAYER_ID_KEY, created);
   return created;
 }
 
 function sanitizeNickname(value: string) {
-  return value
+  const sanitized = value
     .replace(/[<>{}[\]"'`]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 12);
+  const blocked = /(시발|씨발|병신|개새|좆|fuck|shit)/i;
+  return blocked.test(sanitized) ? "" : sanitized;
 }
 
 function normalizeEntry(raw: unknown): LeaderboardEntry | undefined {
@@ -177,11 +176,92 @@ function readLocalEntries(): LocalEntry[] {
 
 function saveLocalEntry(entry: LocalEntry) {
   const current = readLocalEntries();
-  const previous = current.find((item) => item.playerId === entry.playerId);
+  const previous = current.find((item) => item.playerId === entry.playerId && item.chapter === entry.chapter);
   const next = previous && compareEntries(previous, entry) <= 0
     ? current
-    : [entry, ...current.filter((item) => item.playerId !== entry.playerId)];
+    : [entry, ...current.filter((item) => item.playerId !== entry.playerId || item.chapter !== entry.chapter)];
   localStorage.setItem(LOCAL_RANKING_KEY, JSON.stringify(next.sort(compareEntries).slice(0, 50)));
+}
+
+function generatedNickname() {
+  return `꿈사수-${getPlayerId().slice(0, 4).toUpperCase()}`;
+}
+
+function normalizeChapter(chapter: number) {
+  return chapter === 2 ? 2 : 1;
+}
+
+function createPlayerId() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function readPendingEntries(): LocalEntry[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || "[]") as unknown[];
+    return saved
+      .map((entry) => {
+        const normalized = normalizeEntry(entry);
+        const playerId = entry && typeof entry === "object" ? String((entry as Partial<LocalEntry>).playerId || "") : "";
+        return normalized && playerId ? { ...normalized, playerId } : undefined;
+      })
+      .filter((entry): entry is LocalEntry => Boolean(entry));
+  } catch {
+    return [];
+  }
+}
+
+function queuePendingEntry(entry: LocalEntry) {
+  const current = readPendingEntries();
+  const previous = current.find((item) => item.playerId === entry.playerId && item.chapter === entry.chapter);
+  const next = previous && compareEntries(previous, entry) <= 0
+    ? current
+    : [entry, ...current.filter((item) => item.playerId !== entry.playerId || item.chapter !== entry.chapter)];
+  localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(next.slice(0, 10)));
+}
+
+async function flushPendingEntries() {
+  const pending = readPendingEntries();
+  if (!isOnlineLeaderboardConfigured || pending.length === 0) return pending.length;
+  const remaining: LocalEntry[] = [];
+  for (const entry of pending) {
+    try {
+      await postEntry(entry);
+    } catch {
+      remaining.push(entry);
+    }
+  }
+  localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(remaining));
+  return remaining.length;
+}
+
+async function postEntry(entry: LocalEntry) {
+  const response = await fetchWithTimeout(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=UTF-8" },
+    body: JSON.stringify({
+      gameId: GAME_ID,
+      playerId: entry.playerId,
+      nickname: entry.nickname,
+      record: {
+        score: entry.score,
+        stage: entry.stage,
+        chapter: entry.chapter,
+        grade: entry.grade,
+        cleared: entry.cleared,
+        elapsedMs: entry.elapsedMs
+      }
+    })
+  });
+  const payload = await response.json() as { ok?: boolean; error?: string };
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `랭킹 등록 실패: ${response.status}`);
+  }
 }
 
 function compareEntries(a: LeaderboardEntry, b: LeaderboardEntry) {

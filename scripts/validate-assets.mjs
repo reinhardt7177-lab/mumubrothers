@@ -65,7 +65,8 @@ for (const backgroundPath of [
   "public/assets/phase4/dream-bedroom-stage.png",
   "public/assets/phase4/stage2-star-toyworks-v1.png",
   "public/assets/phase4/stage3-cloud-library-v1.png",
-  "public/assets/phase4/stage4-starwhale-harbor-v1.png"
+  "public/assets/phase4/stage4-starwhale-harbor-v1.png",
+  "public/assets/phase4/dream-expedition-ending.png"
 ]) {
   const background = readPng(backgroundPath);
   const backgroundRatio = background.width / background.height;
@@ -138,4 +139,4 @@ for (const relativePath of [
   if (coverage < 0.08 || coverage > 0.78) throw new Error(`${relativePath}: implausible cutout coverage ${coverage.toFixed(3)}`);
 }
 
-console.log("Validated legacy cutouts and Phase 4 background, four-slot sheets, workbench items, projectiles, boss, and cover.");
+console.log("Validated legacy cutouts and Phase 4 backgrounds, ending art, four-slot sheets, workbench items, projectiles, bosses, and cover.");

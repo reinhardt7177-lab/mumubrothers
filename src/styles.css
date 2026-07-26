@@ -735,6 +735,152 @@ body {
   display: none;
 }
 
+.ending {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  overflow: hidden;
+  background: #0a1735;
+  color: #fff5cf;
+}
+
+.ending.hidden {
+  display: none;
+}
+
+.ending-art,
+.ending-shade {
+  position: absolute;
+  inset: 0;
+}
+
+.ending-art {
+  background: url("/assets/phase4/dream-expedition-ending.png") center / cover no-repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.ending-shade {
+  background:
+    linear-gradient(180deg, rgba(5, 13, 38, 0.74) 0%, rgba(5, 13, 38, 0.18) 31%, transparent 50%),
+    linear-gradient(0deg, rgba(5, 11, 26, 0.9) 0%, rgba(5, 11, 26, 0.25) 28%, transparent 48%);
+  pointer-events: none;
+}
+
+.ending-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: clamp(22px, 5vh, 48px) 24px 18px;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+  text-shadow: 0 3px 0 #17204b, 0 7px 20px rgba(0, 0, 0, 0.75);
+}
+
+.ending-content > small {
+  color: #72ffcf;
+  font-family: var(--font-score);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ending-content h2 {
+  max-width: 780px;
+  margin: 4px 0 0;
+  color: #fff1bd;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 4.8vw, 52px);
+  line-height: 1;
+}
+
+.ending-content > p {
+  max-width: 650px;
+  margin: 9px 0 0;
+  color: #d9eeff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ending-stats {
+  display: grid;
+  width: min(520px, 100%);
+  margin-top: auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid rgba(146, 235, 255, 0.72);
+  border-bottom: 1px solid rgba(255, 216, 108, 0.72);
+  background: rgba(7, 17, 42, 0.78);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
+}
+
+.ending-stats span {
+  min-width: 0;
+  padding: 8px 12px;
+}
+
+.ending-stats span + span {
+  border-left: 1px solid rgba(146, 235, 255, 0.24);
+}
+
+.ending-stats small,
+.ending-stats strong {
+  display: block;
+}
+
+.ending-stats small {
+  color: #8feeff;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.ending-stats strong {
+  overflow: hidden;
+  margin-top: 3px;
+  color: #fff0b3;
+  font-family: var(--font-score);
+  font-size: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ending-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.ending-actions button {
+  min-width: 164px;
+  min-height: 42px;
+  padding: 8px 16px;
+  border: 2px solid rgba(255, 243, 205, 0.9);
+  color: #fff7df;
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.ending-ranking {
+  background: #ff657c;
+  box-shadow: 0 5px 0 #7d2944;
+}
+
+.ending-restart {
+  background: #193c62;
+  box-shadow: 0 5px 0 #0c203d;
+}
+
+.ending-actions button:hover {
+  filter: brightness(1.12);
+}
+
+.ending-actions button:active {
+  transform: translateY(2px);
+  box-shadow: 0 3px 0 #0c203d;
+}
+
 .intro-art {
   position: absolute;
   inset: 0;
@@ -927,6 +1073,35 @@ body {
   gap: 16px;
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(143, 238, 255, 0.28);
+}
+
+.leaderboard-tabs {
+  display: grid;
+  width: min(360px, 100%);
+  margin: 10px auto 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid rgba(143, 238, 255, 0.34);
+}
+
+.leaderboard-tab {
+  min-height: 34px;
+  border: 0;
+  background: rgba(13, 31, 65, 0.72);
+  color: #9fcbe4;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.leaderboard-tab + .leaderboard-tab {
+  border-left: 1px solid rgba(143, 238, 255, 0.34);
+}
+
+.leaderboard-tab.selected {
+  background: #24547b;
+  box-shadow: inset 0 -3px #ffd86c;
+  color: #fff3c7;
 }
 
 .leaderboard-header small,
@@ -2380,7 +2555,43 @@ body {
   }
 }
 
+body.ending-preview .rotate-notice {
+  display: none !important;
+}
+
 @media (max-height: 560px) {
+  .ending-content {
+    padding: 14px 18px 10px;
+  }
+
+  .ending-content h2 {
+    font-size: 27px;
+  }
+
+  .ending-content > p {
+    margin-top: 4px;
+    font-size: 9px;
+  }
+
+  .ending-stats span {
+    padding: 4px 8px;
+  }
+
+  .ending-stats strong {
+    font-size: 15px;
+  }
+
+  .ending-actions {
+    margin-top: 5px;
+  }
+
+  .ending-actions button {
+    min-width: 132px;
+    min-height: 34px;
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
   .leaderboard-overlay {
     padding: 6px;
   }
@@ -2392,6 +2603,15 @@ body {
 
   .leaderboard-header {
     padding-bottom: 5px;
+  }
+
+  .leaderboard-tabs {
+    margin-top: 5px;
+  }
+
+  .leaderboard-tab {
+    min-height: 27px;
+    font-size: 9px;
   }
 
   .leaderboard-header h2 {
