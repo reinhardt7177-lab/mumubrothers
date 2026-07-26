@@ -76,12 +76,14 @@ body {
 
 .hud-meta {
   display: grid;
+  min-width: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
 .hud-vitals {
   display: grid;
+  min-width: 0;
   grid-template-columns: 1.2fr 0.9fr 0.75fr;
   gap: 6px;
 }
@@ -1295,6 +1297,10 @@ body {
   transform: translateY(2px);
 }
 
+.rotate-notice {
+  display: none;
+}
+
 .panel {
   display: none;
   align-self: stretch;
@@ -1392,7 +1398,11 @@ body {
   .shell {
     grid-template-columns: 1fr;
     height: 100vh;
-    padding: 8px;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
   }
 
   .stage-wrap {
@@ -1406,6 +1416,140 @@ body {
   .touch-controls {
     display: flex;
   }
+}
+
+@media (max-width: 900px) and (max-height: 520px) {
+  body {
+    overflow: hidden;
+  }
+
+  .shell {
+    width: 100dvw;
+    height: 100dvh;
+    min-height: 0;
+    padding:
+      max(4px, env(safe-area-inset-top))
+      max(4px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(4px, env(safe-area-inset-left));
+  }
+
+  .stage-wrap {
+    width: min(
+      calc(100dvw - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right))),
+      calc((100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom))) * 16 / 9)
+    );
+  }
+
+  .hud {
+    top: 7px;
+    left: 7px;
+    right: 7px;
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.55fr) minmax(0, 1.18fr);
+    gap: 4px;
+  }
+
+  .hud-meta,
+  .hud-vitals {
+    min-width: 0;
+    gap: 3px;
+  }
+
+  .hud-vitals {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.95fr) minmax(0, 0.72fr);
+  }
+
+  .hud-stat,
+  .hud-progress {
+    min-height: 43px;
+    padding: 4px 5px;
+  }
+
+  .hud span {
+    font-size: 7px;
+  }
+
+  .hud-stat > strong {
+    font-size: 13px;
+  }
+
+  .stage-name {
+    font-size: 10px;
+  }
+
+  .wave-phase {
+    display: none;
+  }
+
+  .progress-line strong,
+  .progress-line span {
+    font-size: 7px;
+  }
+
+  .hud-lives i::before {
+    font-size: 11px;
+  }
+
+  .touch-controls {
+    display: flex;
+    left: 8px;
+    right: 8px;
+    bottom: 7px;
+  }
+
+  .touch-pad {
+    width: 118px;
+    height: 118px;
+  }
+
+  .touch-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 15px;
+  }
+
+  .touch-up,
+  .touch-down {
+    left: 37px;
+  }
+
+  .touch-left,
+  .touch-right {
+    top: 37px;
+  }
+
+  .touch-actions {
+    grid-template-columns: repeat(2, 52px);
+    gap: 6px;
+  }
+
+  .touch-action {
+    min-height: 54px;
+    font-size: 10px;
+  }
+
+  .brother-hud {
+    top: 57px;
+    left: 7px;
+    width: 134px;
+    min-height: 42px;
+  }
+
+  .event-banner {
+    top: 54px;
+    font-size: 8px;
+  }
+
+  .status,
+  .status.large,
+  .status.stage,
+  .status.boss {
+    max-width: calc(100% - 170px);
+    padding: 7px 12px;
+    font-size: 17px;
+    white-space: normal;
+  }
+
 }
 
 @media (pointer: coarse) and (orientation: portrait) {
@@ -1538,6 +1682,66 @@ body {
   .start-game {
     min-height: 46px;
     font-size: 20px;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 620px) {
+  body {
+    overflow: hidden;
+  }
+
+  .rotate-notice {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 10px;
+    padding:
+      max(24px, env(safe-area-inset-top))
+      max(24px, env(safe-area-inset-right))
+      max(24px, env(safe-area-inset-bottom))
+      max(24px, env(safe-area-inset-left));
+    background:
+      linear-gradient(rgba(8, 13, 30, 0.72), rgba(9, 11, 24, 0.9)),
+      url("/assets/phase4/dream-bedroom-stage.png") center / cover no-repeat;
+    text-align: center;
+    image-rendering: auto;
+    touch-action: none;
+  }
+
+  .rotate-phone {
+    position: relative;
+    width: 82px;
+    height: 48px;
+    border: 4px solid #8feeff;
+    border-radius: 7px;
+    box-shadow: 0 0 22px rgba(100, 233, 255, 0.45);
+  }
+
+  .rotate-phone::after {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    width: 4px;
+    height: 4px;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background: #ffd76b;
+    content: "";
+  }
+
+  .rotate-notice strong {
+    color: #fff1c6;
+    font-family: var(--font-display);
+    font-size: 24px;
+  }
+
+  .rotate-notice small {
+    color: #9feaff;
+    font-size: 12px;
+    font-weight: 800;
   }
 }
 
@@ -1876,5 +2080,105 @@ body {
 
   .stage-report .grade {
     font-size: 28px;
+  }
+}
+
+@media (max-width: 900px) and (max-height: 520px) {
+  body {
+    overflow: hidden;
+  }
+
+  .shell {
+    width: 100dvw;
+    height: 100dvh;
+    min-height: 0;
+    padding:
+      max(4px, env(safe-area-inset-top))
+      max(4px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(4px, env(safe-area-inset-left));
+    align-content: center;
+  }
+
+  .stage-wrap {
+    width: min(
+      calc(100dvw - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right))),
+      calc((100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom))) * 16 / 9)
+    );
+  }
+
+  .touch-controls {
+    display: flex;
+    left: 7px;
+    right: 7px;
+    bottom: 6px;
+  }
+
+  .touch-pad {
+    width: 112px;
+    height: 112px;
+  }
+
+  .touch-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 14px;
+  }
+
+  .touch-up,
+  .touch-down {
+    left: 34px;
+  }
+
+  .touch-left,
+  .touch-right {
+    top: 34px;
+  }
+
+  .touch-actions {
+    grid-template-columns: repeat(2, 50px);
+    gap: 5px;
+  }
+
+  .touch-action {
+    min-height: 52px;
+    font-size: 10px;
+  }
+
+  .shop-window {
+    max-height: calc(100% - 8px);
+    padding: 6px 9px;
+  }
+
+  .shop-grid {
+    gap: 3px;
+  }
+
+  .shop button {
+    min-height: 64px;
+    gap: 2px;
+  }
+
+  .shop.phase4-shop .item-icon {
+    width: 54px;
+    height: 36px;
+  }
+
+  .shop button span {
+    font-size: 10px;
+  }
+
+  .shop button small {
+    font-size: 7px;
+  }
+
+  .stage-report {
+    min-height: 36px;
+    margin-bottom: 4px;
+  }
+
+  .shop .continue {
+    min-height: 32px;
+    margin-top: 4px;
   }
 }

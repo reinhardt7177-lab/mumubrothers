@@ -110,6 +110,11 @@ function createShell() {
             <button id="touch-dynamite" class="touch-action dynamite" type="button">폭탄</button>
           </div>
         </div>
+        <div class="rotate-notice" aria-label="가로 화면 안내">
+          <span class="rotate-phone" aria-hidden="true"></span>
+          <strong>가로 화면으로 돌려주세요</strong>
+          <small>전투는 가로 화면에 맞춰져 있습니다</small>
+        </div>
       </section>
       <aside class="panel">
         <h1>무무 브라더스</h1>
@@ -336,6 +341,13 @@ const PHASE4_STAGE_QUOTAS = [
   [6, 7, 5],
   [7, 8, 6]
 ] as const;
+const PHASE4_STAGE_BALANCE = [
+  { hp: 1, armor: 1, break: 1, speed: 1, fireDelay: 1 },
+  { hp: 1.5, armor: 1.35, break: 1.25, speed: 1.06, fireDelay: 0.93 },
+  { hp: 2.15, armor: 1.8, break: 1.55, speed: 1.11, fireDelay: 0.86 },
+  { hp: 3, armor: 2.3, break: 1.9, speed: 1.16, fireDelay: 0.79 }
+] as const;
+const PHASE4_WORKSHOP_UPGRADE_LIMIT = 2;
 const DREAM_STAGE_COUNT = PHASE4_STAGE_QUOTAS.length;
 const PHASE4_PLAYER_SIZE = 154;
 const PHASE4_COVER_DEPTH = 7;
@@ -503,6 +515,8 @@ class MumuBrothersScene extends Phaser.Scene {
   private gunReloadLevel = 0;
   private gunPierceLevel = 0;
   private maxLifeLevel = 0;
+  private workshopUpgradesPurchased = 0;
+  private workshopUpgradeKindsPurchased = new Set<"damage" | "range" | "reload" | "pierce" | "life">();
   private fieldUpgrades = freshFieldUpgrades();
   private dreamParts = freshDreamParts();
   private ammo = 6;
@@ -1407,7 +1421,7 @@ class MumuBrothersScene extends Phaser.Scene {
     const theme = this.currentTheme();
     const enemyTexture = theme.phase4EnemyTexture ?? "phase4Toys";
     const bossTexture = theme.phase4BossTexture ?? "phase4Boss";
-    const stageDifficulty = Math.max(0, this.wave - 1);
+    const stageBalance = PHASE4_STAGE_BALANCE[Phaser.Math.Clamp(this.wave - 1, 0, PHASE4_STAGE_BALANCE.length - 1)];
     const roleSets: ToyRole[][] = [
       ["guard", "bruiser", "sniper"],
       ["bruiser", "shield", "guard", "sniper"],
@@ -1458,12 +1472,13 @@ class MumuBrothersScene extends Phaser.Scene {
       stroke: "#101329",
       strokeThickness: 4
     }).setOrigin(0.5).setVisible(false);
-    const baseHp = isBoss ? 190 : role === "shield" ? 32 : role === "guard" ? 24 : role === "bruiser" ? 20 : 15;
-    const hp = Math.round(baseHp * (1 + stageDifficulty * 0.18) * (isElite ? 1.55 : 1));
-    const baseArmor = isBoss ? 72 : role === "shield" ? 18 : role === "guard" ? 6 : isElite ? 9 : 0;
-    const armor = Math.round(baseArmor * (1 + stageDifficulty * 0.15));
-    const baseBreak = isBoss ? 80 : isElite ? 34 : role === "shield" ? 24 : role === "guard" ? 18 : 0;
-    const maxBreak = Math.round(baseBreak * (1 + stageDifficulty * 0.12));
+    const bossStageRamp = isBoss ? 1 + Math.max(0, this.wave - 1) * 0.18 : 1;
+    const baseHp = isBoss ? 260 : role === "shield" ? 32 : role === "guard" ? 24 : role === "bruiser" ? 20 : 15;
+    const hp = Math.round(baseHp * stageBalance.hp * bossStageRamp * (isElite ? 1.55 : 1));
+    const baseArmor = isBoss ? 96 : role === "shield" ? 18 : role === "guard" ? 6 : isElite ? 9 : 0;
+    const armor = Math.round(baseArmor * stageBalance.armor * (isBoss ? 1 + Math.max(0, this.wave - 1) * 0.12 : 1));
+    const baseBreak = isBoss ? 110 : isElite ? 34 : role === "shield" ? 24 : role === "guard" ? 18 : 0;
+    const maxBreak = Math.round(baseBreak * stageBalance.break * (isBoss ? 1 + Math.max(0, this.wave - 1) * 0.1 : 1));
     const weakOffsetY = isBoss ? -62 : role === "shield" ? -31 : -43;
     const weakpoint = maxBreak > 0
       ? this.add.circle(0, weakOffsetY, isBoss ? 23 : 13, 0x63ffe0, 0.18).setStrokeStyle(isBoss ? 4 : 3, 0xbaffee, 1).setVisible(false)
@@ -1489,7 +1504,7 @@ class MumuBrothersScene extends Phaser.Scene {
       glow,
       hp,
       maxHp: hp,
-      speed: (isBoss ? 24 : role === "bruiser" ? 58 : role === "sniper" ? 34 : 45) * (1 + stageDifficulty * 0.08),
+      speed: (isBoss ? 24 : role === "bruiser" ? 58 : role === "sniper" ? 34 : 45) * stageBalance.speed,
       lane: y,
       nextShot: this.time.now + Phaser.Math.Between(isBoss ? 1200 : 1700, isBoss ? 1900 : 3000),
       nextMove: this.time.now + Phaser.Math.Between(800, 1500),
@@ -1501,7 +1516,7 @@ class MumuBrothersScene extends Phaser.Scene {
       isElite,
       pattern,
       nextSpecial: this.time.now + Phaser.Math.Between(2300, 4200),
-      goldValue: isBoss ? 25 : isElite ? 8 : role === "shield" ? 4 : 2,
+      goldValue: isBoss ? 10 : isElite ? 4 : role === "shield" ? 2 : 1,
       bossPhase: 1,
       weakUntil: 0,
       weakpoint,
@@ -1857,7 +1872,8 @@ class MumuBrothersScene extends Phaser.Scene {
     const intercepted = this.interceptBulletAt(this.reticle.x, this.reticle.y, weapon.radius);
     let hit = intercepted;
     if (!intercepted) {
-      hit = this.hitScanAt(this.reticle.x, this.reticle.y, damage, weapon.radius, weapon.pierce);
+      const enemiesHitThisShot = new Set<Enemy>();
+      hit = this.hitScanAt(this.reticle.x, this.reticle.y, damage, weapon.radius, weapon.pierce, enemiesHitThisShot);
       for (let index = 0; index < weapon.extraHits; index += 1) {
         const side = index % 2 === 0 ? -1 : 1;
         const lane = Math.floor(index / 2) + 1;
@@ -1866,7 +1882,8 @@ class MumuBrothersScene extends Phaser.Scene {
           this.reticle.y,
           damage,
           weapon.radius,
-          weapon.pierce
+          weapon.pierce,
+          enemiesHitThisShot
         ) || hit;
       }
     }
@@ -2176,9 +2193,11 @@ class MumuBrothersScene extends Phaser.Scene {
           : enemy.pattern === "skirmisher"
             ? Phaser.Math.Between(2700, 4100)
             : Phaser.Math.Between(3000, 4500);
-    if (enemy.threat === "red") return Math.round(base * 0.72);
-    if (enemy.threat === "purple") return Math.round(base * 0.88);
-    return base;
+    const threatFactor = enemy.threat === "red" ? 0.72 : enemy.threat === "purple" ? 0.88 : 1;
+    const stageFactor = this.phase4Mode()
+      ? PHASE4_STAGE_BALANCE[Phaser.Math.Clamp(this.wave - 1, 0, PHASE4_STAGE_BALANCE.length - 1)].fireDelay
+      : 1;
+    return Math.round(base * threatFactor * stageFactor);
   }
 
   private updateBullets(delta: number) {
@@ -2250,7 +2269,7 @@ class MumuBrothersScene extends Phaser.Scene {
     return false;
   }
 
-  private hitScanAt(x: number, y: number, damage: number, radius: number, pierce = 0) {
+  private hitScanAt(x: number, y: number, damage: number, radius: number, pierce = 0, enemiesHitThisShot?: Set<Enemy>) {
     const shotLine = new Phaser.Geom.Line(this.player.x, this.player.y - 18, x, y);
     const blocker = this.firstPropOnLine(shotLine);
     if (blocker) {
@@ -2262,7 +2281,7 @@ class MumuBrothersScene extends Phaser.Scene {
 
     const targets = this.enemies
       .filter((enemy) => {
-        if (!enemy.alive) return false;
+        if (!enemy.alive || enemiesHitThisShot?.has(enemy)) return false;
         const bodyHit = Phaser.Geom.Intersects.RectangleToRectangle(hitArea, enemy.body.getBounds());
         const weakHit = this.enemyWeakpointHit(enemy, x, y, radius);
         return bodyHit || weakHit;
@@ -2272,6 +2291,7 @@ class MumuBrothersScene extends Phaser.Scene {
       for (const enemy of targets.slice(0, pierce + 1)) {
         const weakHit = this.enemyWeakpointHit(enemy, x, y, radius);
         this.damageEnemy(enemy, damage * this.rangeDamageMultiplier(enemy), weakHit, "shot");
+        enemiesHitThisShot?.add(enemy);
       }
       return true;
     }
@@ -2343,18 +2363,18 @@ class MumuBrothersScene extends Phaser.Scene {
         }
         this.updateEnemyStatusBadge(enemy);
       }
-      if ((enemy.brokenUntil ?? 0) > this.time.now) resolvedDamage *= 1.65;
+      if ((enemy.brokenUntil ?? 0) > this.time.now) resolvedDamage *= enemy.isBoss ? 1.4 : 1.65;
       if ((enemy.maxBreak ?? 0) > 0 && source === "shot" && (enemy.brokenUntil ?? 0) <= this.time.now) {
         const weakBreakBoost = weakHit ? 1.85 : 1;
         const lunarBreakBoost = this.dreamSetState().lunar ? 1.25 : 1;
         enemy.breakValue = (enemy.breakValue ?? 0) + resolvedDamage * weakBreakBoost * lunarBreakBoost * (1 + this.dreamParts.starCylinder * 0.18);
         if ((enemy.breakValue ?? 0) >= (enemy.maxBreak ?? 0)) {
           enemy.breakValue = 0;
-          enemy.brokenUntil = this.time.now + (enemy.isBoss ? 3100 : 2300);
+          enemy.brokenUntil = this.time.now + (enemy.isBoss ? 2200 : 2300);
           enemy.nextShot = enemy.brokenUntil + 700;
           enemy.armor = Math.max(0, (enemy.armor ?? 0) - (enemy.maxArmor ?? 0) * 0.35);
           enemy.weakpoint?.setVisible(true);
-          const breakReward = enemy.isBoss ? 3 : 1;
+          const breakReward = enemy.isBoss ? 2 : 1;
           this.stageCoreBreaks += 1;
           this.gold += breakReward;
           this.ammo = Math.min(this.magazineSize(), this.ammo + 1);
@@ -2425,7 +2445,8 @@ class MumuBrothersScene extends Phaser.Scene {
       if (enemy.isElite) this.stageEliteKills += 1;
       this.tagMeter = Phaser.Math.Clamp(this.tagMeter + (enemy.isElite ? 22 : 9), 0, 100);
     }
-    this.pop(enemy.sprite.x, enemy.sprite.y, enemy.isBoss ? `+${earnedGold}골드 보스` : enemy.isElite ? `+${earnedGold}골드 정예` : `+${earnedGold}골드`);
+    const currency = this.phase4Mode() ? "꿈가루" : "골드";
+    this.pop(enemy.sprite.x, enemy.sprite.y, enemy.isBoss ? `+${earnedGold}${currency} 보스` : enemy.isElite ? `+${earnedGold}${currency} 정예` : `+${earnedGold}${currency}`);
     this.explode(enemy.sprite.x, enemy.sprite.y);
     enemy.body.destroy();
     enemy.aimGuide?.destroy();
@@ -2577,6 +2598,8 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private openShop() {
     this.inShop = true;
+    this.workshopUpgradesPurchased = 0;
+    this.workshopUpgradeKindsPurchased.clear();
     this.isPointerDown = false;
     this.activeTouchMoves.clear();
     this.updateTouchMove();
@@ -2609,7 +2632,10 @@ class MumuBrothersScene extends Phaser.Scene {
     const kind = Phaser.Utils.Array.GetRandom(lowestParts);
     const accuracy = this.shotsFired > 0 ? this.shotsHit / this.shotsFired : 0;
     const resonanceMastery = this.stageCoreBreaks >= 2 && this.stageDreamBursts >= 2;
-    const rarity: LootRarity = (accuracy >= 0.72 && this.stageDamageTaken <= 1) || resonanceMastery ? "legendary" : "epic";
+    const legendaryMastery = (accuracy >= 0.82 && this.stageDamageTaken === 0 && this.stageCoreBreaks >= 2)
+      || (resonanceMastery && accuracy >= 0.72);
+    const epicMastery = (accuracy >= 0.62 && this.stageDamageTaken <= 2) || resonanceMastery;
+    const rarity: LootRarity = legendaryMastery ? "legendary" : epicMastery ? "epic" : "rare";
     const rarityInfo = LOOT_RARITIES[rarity];
     const gain = Math.min(rarityInfo.gain, DREAM_PARTS[kind].max - this.dreamParts[kind]);
     this.dreamParts[kind] += gain;
@@ -2652,7 +2678,9 @@ class MumuBrothersScene extends Phaser.Scene {
     points += this.stageEliteKills >= 3 ? 2 : this.stageEliteKills >= 1 ? 1 : 0;
     points += this.stageCoreBreaks >= 3 ? 2 : this.stageCoreBreaks >= 1 ? 1 : 0;
     const grade: StageReport["grade"] = points >= 9 ? "S" : points >= 7 ? "A" : points >= 5 ? "B" : "C";
-    const bonus = { S: 15, A: 10, B: 6, C: 2 }[grade];
+    const bonus = this.phase4Mode()
+      ? { S: 7, A: 5, B: 3, C: 1 }[grade]
+      : { S: 15, A: 10, B: 6, C: 2 }[grade];
     return {
       grade,
       accuracy,
@@ -2685,9 +2713,22 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private buyShopItem(kind: "damage" | "range" | "reload" | "pierce" | "life" | "potion" | "dynamite") {
-    const cost = kind === "potion" ? 4 : kind === "dynamite" ? 6 : this.upgradeCost(kind);
-    if (kind !== "potion" && kind !== "dynamite" && this.upgradeLevel(kind) >= this.upgradeMax(kind)) {
+    const permanentUpgrade = kind !== "potion" && kind !== "dynamite";
+    const cost = kind === "potion"
+      ? this.phase4Mode() ? 7 : 4
+      : kind === "dynamite"
+        ? this.phase4Mode() ? 12 : 6
+        : this.upgradeCost(kind);
+    if (permanentUpgrade && this.upgradeLevel(kind) >= this.upgradeMax(kind)) {
       this.updateHud("이미 최대 단계입니다");
+      return;
+    }
+    if (this.phase4Mode() && permanentUpgrade && this.workshopUpgradesPurchased >= PHASE4_WORKSHOP_UPGRADE_LIMIT) {
+      this.updateHud("이번 작업대의 영구 개조 슬롯을 모두 사용했습니다");
+      return;
+    }
+    if (this.phase4Mode() && permanentUpgrade && this.workshopUpgradeKindsPurchased.has(kind)) {
+      this.updateHud("같은 부품은 다음 작업대에서 다시 개조할 수 있습니다");
       return;
     }
     if (kind === "dynamite" && this.dynamite >= 3) {
@@ -2726,6 +2767,10 @@ class MumuBrothersScene extends Phaser.Scene {
     } else if (kind === "dynamite") {
       this.dynamite += 1;
     }
+    if (permanentUpgrade) {
+      this.workshopUpgradesPurchased += 1;
+      this.workshopUpgradeKindsPurchased.add(kind);
+    }
     this.updateHud(
       kind === "potion" || kind === "dynamite"
         ? "보급 완료"
@@ -2741,7 +2786,7 @@ class MumuBrothersScene extends Phaser.Scene {
     const setLabels = this.dreamSetLabels();
     if (phase4) this.shopTitle.textContent = `꿈 작업대 - ${this.weaponGrade()}등급 개조`;
     this.shopGoldText.textContent = this.phase4Mode()
-      ? `꿈가루 ${this.gold} | ${this.weaponName()} | 공명 ${this.dreamResonance} | 엄폐 ${this.maxCoverHp}`
+      ? `꿈가루 ${this.gold} | 영구 개조 ${this.workshopUpgradesPurchased}/${PHASE4_WORKSHOP_UPGRADE_LIMIT} | ${this.weaponName()} | 공명 ${this.dreamResonance} | 엄폐 ${this.maxCoverHp}`
       : `골드 ${this.gold} | ${this.weaponName()} | 공격 ${this.gunDamageLevel} 범위 ${this.gunRangeLevel} 장전 ${this.gunReloadLevel} 관통 ${this.gunPierceLevel}`;
     this.shopBuildText.textContent = this.phase4Mode()
       ? `${this.bossLootSummary ? `${this.bossLootSummary} | ` : ""}세트: ${setLabels.join(" + ") || "미완성"} | 부품: ${Object.entries(this.dreamParts).filter(([, level]) => level > 0).map(([kind, level]) => `${DREAM_PARTS[kind as DreamPartKind].label} ${level}`).join(" + ") || "없음"}`
@@ -2752,16 +2797,17 @@ class MumuBrothersScene extends Phaser.Scene {
     this.buyPierceButton.innerHTML = this.upgradeHtml(phase4 ? "dream-star-needle" : "rifle", phase4 ? "별 관통침" : "관통 장치", "pierce", `관통 대상 +1`);
     this.buyLifeButton.innerHTML = this.upgradeHtml(phase4 ? "dream-guardian-star" : "potion", phase4 ? "수호 별조각" : "강철 심장", "life", phase4 ? "생명력 +1, 엄폐 +10" : "최대 생명력 +1");
     this.buyPotionButton.innerHTML = phase4
-      ? `<i class="item-icon dream-repair-elixir"></i><span>꿈결 수리액</span><small>4꿈가루 | 생명력·엄폐 복구</small>`
+      ? `<i class="item-icon dream-repair-elixir"></i><span>꿈결 수리액</span><small>7꿈가루 | 생명력·엄폐 복구</small>`
       : `<i class="item-icon potion"></i><span>회복 물약</span><small>4골드 | 생명력 2 회복</small>`;
     this.buyDynamiteButton.innerHTML = phase4
-      ? `<i class="item-icon dream-constellation-bomb"></i><span>별무리 폭탄</span><small>6꿈가루 | 화면 전체 붕괴</small>`
+      ? `<i class="item-icon dream-constellation-bomb"></i><span>별무리 폭탄</span><small>12꿈가루 | 화면 전체 붕괴</small>`
       : `<i class="item-icon dynamite"></i><span>다이너마이트</span><small>6골드 | 화면 전체 공격, 최대 3개</small>`;
-    this.buyDamageButton.disabled = this.gunDamageLevel >= this.upgradeMax("damage");
-    this.buyRangeButton.disabled = this.gunRangeLevel >= this.upgradeMax("range");
-    this.buyReloadButton.disabled = this.gunReloadLevel >= this.upgradeMax("reload");
-    this.buyPierceButton.disabled = this.gunPierceLevel >= this.upgradeMax("pierce");
-    this.buyLifeButton.disabled = this.maxLifeLevel >= this.upgradeMax("life");
+    const workshopFull = phase4 && this.workshopUpgradesPurchased >= PHASE4_WORKSHOP_UPGRADE_LIMIT;
+    this.buyDamageButton.disabled = workshopFull || this.workshopUpgradeKindsPurchased.has("damage") || this.gunDamageLevel >= this.upgradeMax("damage");
+    this.buyRangeButton.disabled = workshopFull || this.workshopUpgradeKindsPurchased.has("range") || this.gunRangeLevel >= this.upgradeMax("range");
+    this.buyReloadButton.disabled = workshopFull || this.workshopUpgradeKindsPurchased.has("reload") || this.gunReloadLevel >= this.upgradeMax("reload");
+    this.buyPierceButton.disabled = workshopFull || this.workshopUpgradeKindsPurchased.has("pierce") || this.gunPierceLevel >= this.upgradeMax("pierce");
+    this.buyLifeButton.disabled = workshopFull || this.workshopUpgradeKindsPurchased.has("life") || this.maxLifeLevel >= this.upgradeMax("life");
     this.buyPotionButton.disabled = phase4
       ? this.lives >= this.maxLives && this.coverHp >= this.maxCoverHp && this.coverBrokenUntil <= this.time.now
       : this.lives >= this.maxLives;
@@ -2784,6 +2830,11 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private upgradeCost(kind: "damage" | "range" | "reload" | "pierce" | "life") {
     const level = this.upgradeLevel(kind);
+    if (this.phase4Mode()) {
+      const base = { damage: 9, range: 8, reload: 10, pierce: 14, life: 12 }[kind];
+      const step = { damage: 7, range: 6, reload: 7, pierce: 10, life: 9 }[kind];
+      return base + level * step;
+    }
     const base = { damage: 6, range: 5, reload: 7, pierce: 10, life: 8 }[kind];
     return base + level * (kind === "pierce" ? 10 : kind === "life" ? 8 : 6);
   }
@@ -2803,7 +2854,7 @@ class MumuBrothersScene extends Phaser.Scene {
     const dreamDamage = this.dreamParts.cometHammer;
     const dreamTempo = Math.pow(0.9, this.dreamParts.cometHammer);
     const dreamSets = this.dreamSetState();
-    const resonanceDamage = Math.floor(this.dreamResonance / 4);
+    const resonanceDamage = Math.floor(this.dreamResonance / 6);
     return {
       damage: 1 + this.gunDamageLevel + this.fieldUpgrades.highCaliber + dreamDamage + resonanceDamage + (dreamSets.comet ? 1 : 0) + (blue ? 0 : 1),
       radius: 28 + this.gunRangeLevel * 10 + this.dreamParts.moonChoke * 8 + (dreamSets.lunar ? 10 : 0) + (blue ? 0 : 14),
@@ -2864,7 +2915,8 @@ class MumuBrothersScene extends Phaser.Scene {
     this.dynamite -= 1;
     const liveEnemies = this.enemies.filter((enemy) => enemy.alive);
     for (const enemy of liveEnemies) {
-      this.damageEnemy(enemy, enemy.isBoss ? Math.ceil(enemy.maxHp * 0.28) : 999, false, "dynamite");
+      const bossDamageRatio = this.phase4Mode() ? 0.16 : 0.28;
+      this.damageEnemy(enemy, enemy.isBoss ? Math.ceil(enemy.maxHp * bossDamageRatio) : 999, false, "dynamite");
     }
     this.cameras.main.shake(420, 0.018);
     this.punchCameraFilter(9, 0.78, 760);
