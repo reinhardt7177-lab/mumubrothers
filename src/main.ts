@@ -1,5 +1,12 @@
 import Phaser from "phaser";
 import "./styles.css";
+import {
+  getLeaderboardNickname,
+  loadLeaderboard,
+  submitLeaderboardScore,
+  type LeaderboardEntry,
+  type ScoreSubmission
+} from "./leaderboard";
 
 function createShell() {
   document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -96,7 +103,38 @@ function createShell() {
               <small>기존 열 단계 도전</small>
             </button>
           </div>
-          <button id="start-game" class="start-game" type="button">게임 시작</button>
+          <div class="intro-actions">
+            <button id="start-game" class="start-game" type="button">게임 시작</button>
+            <button id="open-leaderboard" class="open-leaderboard" type="button">TOP 10</button>
+          </div>
+        </div>
+        <div id="leaderboard" class="leaderboard-overlay hidden" aria-hidden="true">
+          <section class="leaderboard-window" role="dialog" aria-modal="true" aria-labelledby="leaderboard-title">
+            <header class="leaderboard-header">
+              <div>
+                <small id="leaderboard-mode">공용 랭킹 연결 중</small>
+                <h2 id="leaderboard-title">꿈 사수단 TOP 10</h2>
+              </div>
+              <button id="close-leaderboard" class="leaderboard-close" type="button" aria-label="랭킹 닫기">&times;</button>
+            </header>
+            <div id="leaderboard-result" class="leaderboard-result hidden">
+              <span>이번 도전</span>
+              <strong id="leaderboard-result-score">0점</strong>
+              <small id="leaderboard-result-detail">1단계 · D등급</small>
+            </div>
+            <div class="leaderboard-columns" aria-hidden="true">
+              <span>순위</span><span>꿈 사수</span><span>기록</span>
+            </div>
+            <ol id="leaderboard-list" class="leaderboard-list">
+              <li class="leaderboard-empty">랭킹을 불러오는 중입니다</li>
+            </ol>
+            <form id="leaderboard-form" class="leaderboard-form">
+              <label for="leaderboard-nickname">닉네임</label>
+              <input id="leaderboard-nickname" maxlength="12" autocomplete="nickname" inputmode="text" />
+              <button id="submit-leaderboard" type="submit">기록 등록</button>
+            </form>
+            <p id="leaderboard-message" class="leaderboard-message" aria-live="polite">게임 종료 후 최고 점수를 등록할 수 있습니다.</p>
+          </section>
         </div>
         <div class="touch-controls" aria-label="터치 조작">
           <div class="touch-pad" aria-label="이동">
@@ -563,6 +601,9 @@ class MumuBrothersScene extends Phaser.Scene {
   private stageDreamBursts = 0;
   private stageReport?: StageReport;
   private runCompletePending = false;
+  private runStartedAt = 0;
+  private leaderboardOpen = false;
+  private leaderboardSubmission?: ScoreSubmission;
   private scoreText!: HTMLElement;
   private waveText!: HTMLElement;
   private stageNameText!: HTMLElement;
@@ -600,6 +641,18 @@ class MumuBrothersScene extends Phaser.Scene {
   private fieldUpgradeOptions!: HTMLElement;
   private introOverlay!: HTMLElement;
   private startButton!: HTMLButtonElement;
+  private openLeaderboardButton!: HTMLButtonElement;
+  private leaderboardOverlay!: HTMLElement;
+  private leaderboardModeText!: HTMLElement;
+  private leaderboardResult!: HTMLElement;
+  private leaderboardResultScore!: HTMLElement;
+  private leaderboardResultDetail!: HTMLElement;
+  private leaderboardList!: HTMLOListElement;
+  private leaderboardForm!: HTMLFormElement;
+  private leaderboardNickname!: HTMLInputElement;
+  private leaderboardSubmitButton!: HTMLButtonElement;
+  private leaderboardMessage!: HTMLElement;
+  private closeLeaderboardButton!: HTMLButtonElement;
   private chapterButtons: HTMLButtonElement[] = [];
   private touchDynamiteButton!: HTMLButtonElement;
   private touchTagButton!: HTMLButtonElement;
@@ -686,6 +739,7 @@ class MumuBrothersScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     const time = this.time.now;
+    if (this.leaderboardOpen) return;
     if (!this.gameStarted) {
       if (Phaser.Input.Keyboard.JustDown(this.keys.ENTER) || Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.startGame();
       return;
@@ -793,6 +847,18 @@ class MumuBrothersScene extends Phaser.Scene {
     this.fieldUpgradeOptions = document.querySelector("#field-upgrade-options")!;
     this.introOverlay = document.querySelector("#intro")!;
     this.startButton = document.querySelector("#start-game")!;
+    this.openLeaderboardButton = document.querySelector("#open-leaderboard")!;
+    this.leaderboardOverlay = document.querySelector("#leaderboard")!;
+    this.leaderboardModeText = document.querySelector("#leaderboard-mode")!;
+    this.leaderboardResult = document.querySelector("#leaderboard-result")!;
+    this.leaderboardResultScore = document.querySelector("#leaderboard-result-score")!;
+    this.leaderboardResultDetail = document.querySelector("#leaderboard-result-detail")!;
+    this.leaderboardList = document.querySelector("#leaderboard-list")!;
+    this.leaderboardForm = document.querySelector("#leaderboard-form")!;
+    this.leaderboardNickname = document.querySelector("#leaderboard-nickname")!;
+    this.leaderboardSubmitButton = document.querySelector("#submit-leaderboard")!;
+    this.leaderboardMessage = document.querySelector("#leaderboard-message")!;
+    this.closeLeaderboardButton = document.querySelector("#close-leaderboard")!;
     this.chapterButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-chapter]")];
     this.touchDynamiteButton = document.querySelector("#touch-dynamite")!;
     this.touchTagButton = document.querySelector("#touch-tag")!;
@@ -814,6 +880,16 @@ class MumuBrothersScene extends Phaser.Scene {
     this.continueButton.addEventListener("click", () => this.leaveShop());
     this.brotherTagButton.addEventListener("click", () => this.swapBrother());
     this.startButton.addEventListener("click", () => this.startGame());
+    this.openLeaderboardButton.addEventListener("click", () => void this.openLeaderboard());
+    this.closeLeaderboardButton.addEventListener("click", () => this.closeLeaderboard());
+    this.leaderboardOverlay.addEventListener("click", (event) => {
+      if (event.target === this.leaderboardOverlay) this.closeLeaderboard();
+    });
+    this.leaderboardForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void this.submitLeaderboard();
+    });
+    this.leaderboardNickname.value = getLeaderboardNickname();
     this.chapterButtons.forEach((button) => {
       button.addEventListener("click", () => this.selectChapter(Number(button.dataset.chapter)));
     });
@@ -823,6 +899,106 @@ class MumuBrothersScene extends Phaser.Scene {
     });
     this.damageFlash.addEventListener("animationend", () => this.damageFlash.classList.remove("show"));
     this.bindTouchControls();
+  }
+
+  private buildLeaderboardSubmission(cleared: boolean): ScoreSubmission {
+    return {
+      score: this.score,
+      stage: this.wave,
+      chapter: this.chapterForStage(this.wave),
+      grade: this.weaponGrade(),
+      cleared,
+      elapsedMs: Math.max(0, this.time.now - this.runStartedAt)
+    };
+  }
+
+  private async openLeaderboard(submission?: ScoreSubmission) {
+    if (submission) this.leaderboardSubmission = submission;
+    this.leaderboardOpen = true;
+    this.isPointerDown = false;
+    this.enterCover();
+    this.leaderboardOverlay.classList.remove("hidden");
+    this.leaderboardOverlay.setAttribute("aria-hidden", "false");
+    this.leaderboardNickname.value = getLeaderboardNickname();
+    this.leaderboardSubmitButton.disabled = !this.leaderboardSubmission;
+    this.leaderboardForm.classList.toggle("disabled", !this.leaderboardSubmission);
+    this.leaderboardResult.classList.toggle("hidden", !this.leaderboardSubmission);
+    if (this.leaderboardSubmission) {
+      const result = this.leaderboardSubmission;
+      this.leaderboardResultScore.textContent = `${result.score.toLocaleString("ko-KR")}점`;
+      this.leaderboardResultDetail.textContent =
+        `${result.stage}단계 · ${result.grade}등급${result.cleared ? " · 꿈 원정 완료" : ""}`;
+      this.leaderboardMessage.textContent = "닉네임을 확인하고 이번 최고 기록을 등록하세요.";
+    } else {
+      this.leaderboardMessage.textContent = "게임 종료 후 최고 점수를 등록할 수 있습니다.";
+    }
+    this.leaderboardList.replaceChildren(this.makeLeaderboardMessage("랭킹을 불러오는 중입니다"));
+    const snapshot = await loadLeaderboard();
+    if (!this.leaderboardOpen) return;
+    this.renderLeaderboardEntries(snapshot.entries);
+    this.leaderboardModeText.textContent = snapshot.source === "online" ? "온라인 공용 랭킹" : "이 기기의 로컬 랭킹";
+    this.leaderboardModeText.classList.toggle("online", snapshot.source === "online");
+  }
+
+  private closeLeaderboard() {
+    this.leaderboardOpen = false;
+    this.leaderboardOverlay.classList.add("hidden");
+    this.leaderboardOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  private async submitLeaderboard() {
+    if (!this.leaderboardSubmission || this.leaderboardSubmitButton.disabled) return;
+    this.leaderboardSubmitButton.disabled = true;
+    this.leaderboardNickname.disabled = true;
+    this.leaderboardMessage.textContent = "최고 기록을 등록하는 중입니다.";
+    const nickname = this.leaderboardNickname.value;
+    try {
+      const snapshot = await submitLeaderboardScore(this.leaderboardSubmission, nickname);
+      this.leaderboardNickname.value = getLeaderboardNickname();
+      this.renderLeaderboardEntries(snapshot.entries, this.leaderboardSubmission.score);
+      this.leaderboardModeText.textContent = snapshot.source === "online" ? "온라인 공용 랭킹" : "로컬 저장 · 서버 연결 대기";
+      this.leaderboardModeText.classList.toggle("online", snapshot.source === "online");
+      this.leaderboardMessage.textContent = snapshot.source === "online"
+        ? "기록 등록 완료! 최고 기록만 랭킹에 남습니다."
+        : "기록은 이 기기에 저장했습니다. Apps Script 업데이트 후 온라인에 연결됩니다.";
+    } finally {
+      this.leaderboardNickname.disabled = false;
+      this.leaderboardSubmitButton.disabled = false;
+    }
+  }
+
+  private renderLeaderboardEntries(entries: LeaderboardEntry[], currentScore?: number) {
+    this.leaderboardList.replaceChildren();
+    if (entries.length === 0) {
+      this.leaderboardList.append(this.makeLeaderboardMessage("아직 등록된 꿈 사수가 없습니다"));
+      return;
+    }
+    entries.forEach((entry, index) => {
+      const item = document.createElement("li");
+      if (entry.nickname === getLeaderboardNickname() && entry.score === currentScore) item.classList.add("mine");
+
+      const rank = document.createElement("b");
+      rank.textContent = String(index + 1);
+
+      const player = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = entry.nickname;
+      const detail = document.createElement("small");
+      detail.textContent = `${entry.stage}단계 · ${entry.grade}등급${entry.cleared ? " · 완료" : ""}`;
+      player.append(name, detail);
+
+      const score = document.createElement("em");
+      score.textContent = entry.score.toLocaleString("ko-KR");
+      item.append(rank, player, score);
+      this.leaderboardList.append(item);
+    });
+  }
+
+  private makeLeaderboardMessage(message: string) {
+    const item = document.createElement("li");
+    item.className = "leaderboard-empty";
+    item.textContent = message;
+    return item;
   }
 
   private setupPhaser4Rendering() {
@@ -985,6 +1161,7 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private beginGame() {
     this.gameStarted = true;
+    this.runStartedAt = this.time.now;
     this.introOverlay.classList.add("hidden");
     this.spawnWave();
     this.updateHud(this.stageTitle());
@@ -2122,26 +2299,56 @@ class MumuBrothersScene extends Phaser.Scene {
       enemy.nextSpecial = time + 3600;
       this.pop(enemy.sprite.x, enemy.sprite.y - 48, "접근 중");
     } else if (enemy.role === "bruiser" && enemy.rangeBand === "near" && time > enemy.nextSpecial) {
-      enemy.nextSpecial = time + 3200;
-      const tell = this.add.circle(enemy.sprite.x, enemy.sprite.y - 30, 42).setStrokeStyle(5, 0xff6b62, 0.95).setDepth(13);
-      this.tweens.add({ targets: tell, scale: 1.65, alpha: 0.18, duration: 520, ease: "Quad.easeIn" });
-      this.time.delayedCall(520, () => {
-        tell.destroy();
-        if (!enemy.alive || this.inShop || this.isGameOver) return;
-        if (this.covering && this.coverBrokenUntil <= this.time.now && this.coverHp > 0) this.damageCover(9);
-        else if (this.time.now > this.invulnerableUntil) this.damagePlayer();
-        this.cameras.main.shake(150, 0.006);
-      });
+      enemy.direction = enemy.sprite.x < this.player.x ? 1 : -1;
+      if (this.toyMeleeInRange(enemy, 34)) {
+        enemy.nextSpecial = time + 3200;
+        const attackDirection = enemy.direction;
+        const tell = this.add.circle(enemy.sprite.x, enemy.sprite.y - 30, 42).setStrokeStyle(5, 0xff6b62, 0.95).setDepth(13);
+        this.tweens.add({ targets: tell, scale: 1.65, alpha: 0.18, duration: 520, ease: "Quad.easeIn" });
+        this.tweens.add({
+          targets: enemy.sprite,
+          x: enemy.sprite.x + attackDirection * 28,
+          duration: 480,
+          ease: "Cubic.easeIn"
+        });
+        this.time.delayedCall(520, () => {
+          tell.destroy();
+          if (!enemy.alive || this.inShop || this.isGameOver) return;
+          if (!this.toyMeleeInRange(enemy)) {
+            this.pop(enemy.sprite.x, enemy.sprite.y - 52, "회피!");
+            return;
+          }
+          if (this.covering && this.coverBrokenUntil <= this.time.now && this.coverHp > 0) this.damageCover(enemy.isElite ? 12 : 9);
+          else if (this.time.now > this.invulnerableUntil) this.damagePlayer();
+          this.cameras.main.shake(150, 0.006);
+        });
+      }
     } else if (time > enemy.nextMove) {
       enemy.direction = Math.random() > 0.5 ? 1 : -1;
       enemy.nextMove = time + Phaser.Math.Between(enemy.role === "sniper" ? 1500 : 750, enemy.role === "sniper" ? 2600 : 1550);
     }
     const speedScale = enemy.rangeBand === "far" ? 0.75 : enemy.rangeBand === "near" ? 1.12 : 1;
-    enemy.sprite.x += enemy.direction * enemy.speed * speedScale * (delta / 1000);
+    const nearBruiser = enemy.role === "bruiser" && enemy.rangeBand === "near";
+    const horizontalDistance = Math.abs(enemy.sprite.x - this.player.x);
+    const moveDirection = nearBruiser ? (enemy.sprite.x < this.player.x ? 1 : -1) : enemy.direction;
+    const canAdvance = !nearBruiser || horizontalDistance > this.toyMeleeReach(enemy) * 0.72;
+    if (canAdvance) enemy.sprite.x += moveDirection * enemy.speed * speedScale * (delta / 1000);
     if (enemy.sprite.x <= enemy.minX || enemy.sprite.x >= enemy.maxX) enemy.direction *= -1;
     enemy.sprite.x = Phaser.Math.Clamp(enemy.sprite.x, enemy.minX, enemy.maxX);
     const bob = enemy.role === "bruiser" ? 5 : enemy.role === "sniper" ? 2 : 3;
     enemy.sprite.y = enemy.coverY + Math.sin((time + enemy.lane * 7) / 330) * bob;
+  }
+
+  private toyMeleeReach(enemy: Enemy) {
+    const scale = enemy.rangeScale ?? 1;
+    return (enemy.isElite ? 138 : 118) * scale;
+  }
+
+  private toyMeleeInRange(enemy: Enemy, anticipation = 0) {
+    if (enemy.role !== "bruiser" || enemy.rangeBand !== "near") return false;
+    const horizontalDistance = Math.abs(enemy.sprite.x - this.player.x);
+    const verticalDistance = Math.abs(enemy.sprite.y + 34 - this.player.y);
+    return horizontalDistance <= this.toyMeleeReach(enemy) + anticipation && verticalDistance <= 108;
   }
 
   private setEnemyRange(enemy: Enemy, band: RangeBand) {
@@ -2655,6 +2862,7 @@ class MumuBrothersScene extends Phaser.Scene {
       this.isGameOver = true;
       this.statusText.classList.add("large");
       this.updateHud("도전 완료 - R키로 다시 시작");
+      void this.openLeaderboard(this.buildLeaderboardSubmission(true));
       return;
     }
     const nextStage = this.wave + 1;
@@ -2979,6 +3187,7 @@ class MumuBrothersScene extends Phaser.Scene {
       this.updateHud(`계속하시겠습니까? 남은 기회 ${this.continuesLeft}회 - 엔터/터치`);
     } else {
       this.updateHud("게임 종료 - R키로 다시 시작");
+      this.time.delayedCall(250, () => void this.openLeaderboard(this.buildLeaderboardSubmission(false)));
     }
   }
 
