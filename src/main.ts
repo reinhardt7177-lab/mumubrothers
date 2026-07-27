@@ -413,6 +413,9 @@ const PHASE4_PLAYER_SIZE = 154;
 const PHASE4_COVER_DEPTH = 7;
 const PHASE4_PLAYER_DEPTH = 7.2;
 const PHASE4_COVER_FRONT_DEPTH = 7.4;
+const TAP_CHAIN_GRACE_MS = 260;
+const TAP_SHOT_QUEUE_MS = 520;
+const MAX_QUEUED_POINTER_SHOTS = 3;
 const PHASE4_PLAYER_AIM_Y = 0;
 
 const RANGE_STYLE: Record<RangeBand, { y: number; scale: number; color: number; label: string }> = {
@@ -586,6 +589,8 @@ class MumuBrothersScene extends Phaser.Scene {
   private coverReadyAt = 0;
   private lastShotAt = 0;
   private isPointerDown = false;
+  private queuedPointerShots: Array<{ x: number; y: number; expiresAt: number }> = [];
+  private returnToCoverAt = 0;
   private touchMove = { x: 0, y: 0 };
   private activeTouchMoves = new Set<string>();
   private nextPlayerShot = 0;
@@ -758,7 +763,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.covering = true;
     this.coverReadyAt = 0;
     this.lastShotAt = 0;
-    this.isPointerDown = false;
+    this.resetPointerFireInput();
     this.touchMove = { x: 0, y: 0 };
     this.activeTouchMoves = new Set();
     this.nextPlayerShot = 0;
@@ -839,15 +844,15 @@ class MumuBrothersScene extends Phaser.Scene {
         return;
       }
       this.isPointerDown = true;
+      this.returnToCoverAt = 0;
       this.reticle.setPosition(pointer.x, pointer.y);
       if (!this.reloading) this.leaveCover();
-      this.shoot();
+      this.queuePointerShot(pointer.x, pointer.y);
     });
     const releaseFire = () => {
       if (!this.isPointerDown) return;
       this.isPointerDown = false;
-      this.enterCover();
-      this.startReload();
+      this.returnToCoverAt = this.time.now + TAP_CHAIN_GRACE_MS;
     };
     this.input.on("pointerup", releaseFire);
     this.input.on("pointerupoutside", releaseFire);
@@ -900,7 +905,8 @@ class MumuBrothersScene extends Phaser.Scene {
     ) {
       this.shoot();
     }
-    if (this.isPointerDown) this.shoot();
+    this.flushPointerShotQueue(time);
+    if (this.isPointerDown && this.queuedPointerShots.length === 0) this.shoot();
     if (Phaser.Input.Keyboard.JustDown(this.keys.F)) this.throwDynamite();
     if (Phaser.Input.Keyboard.JustDown(this.keys.Q)) this.swapBrother();
     if (Phaser.Input.Keyboard.JustDown(this.keys.R)) {
@@ -909,12 +915,14 @@ class MumuBrothersScene extends Phaser.Scene {
     }
     if (
       !this.isPointerDown &&
+      this.queuedPointerShots.length === 0 &&
       !this.reloading &&
       !this.covering &&
-      time >= this.lastShotAt + 260 &&
+      time >= Math.max(this.lastShotAt + TAP_CHAIN_GRACE_MS, this.returnToCoverAt) &&
       (!this.phase4Mode() || time >= this.coverBrokenUntil)
     ) {
       this.enterCover();
+      this.startReload();
     }
 
     const act = WAVE_ACTS[this.waveAct - 1];
@@ -1072,7 +1080,7 @@ class MumuBrothersScene extends Phaser.Scene {
       this.leaderboardChapter = submission.chapter;
     }
     this.leaderboardOpen = true;
-    this.isPointerDown = false;
+    this.resetPointerFireInput();
     this.enterCover();
     this.leaderboardOverlay.classList.remove("hidden");
     this.leaderboardOverlay.setAttribute("aria-hidden", "false");
@@ -1291,6 +1299,35 @@ class MumuBrothersScene extends Phaser.Scene {
   private updateTouchMove() {
     this.touchMove.x = Number(this.activeTouchMoves.has("right")) - Number(this.activeTouchMoves.has("left"));
     this.touchMove.y = Number(this.activeTouchMoves.has("down")) - Number(this.activeTouchMoves.has("up"));
+  }
+
+  private resetPointerFireInput() {
+    this.isPointerDown = false;
+    this.queuedPointerShots.length = 0;
+    this.returnToCoverAt = 0;
+  }
+
+  private queuePointerShot(x: number, y: number) {
+    if (this.queuedPointerShots.length >= MAX_QUEUED_POINTER_SHOTS) this.queuedPointerShots.shift();
+    this.queuedPointerShots.push({
+      x,
+      y,
+      expiresAt: this.time.now + TAP_SHOT_QUEUE_MS
+    });
+    this.flushPointerShotQueue(this.time.now);
+  }
+
+  private flushPointerShotQueue(time: number) {
+    while (this.queuedPointerShots[0]?.expiresAt < time) this.queuedPointerShots.shift();
+    const shot = this.queuedPointerShots[0];
+    if (!shot || this.reloading || time < this.nextPlayerShot) return;
+    if (this.ammo <= 0) {
+      this.queuedPointerShots.shift();
+      this.startReload();
+      return;
+    }
+    this.reticle.setPosition(shot.x, shot.y);
+    if (this.shoot()) this.queuedPointerShots.shift();
   }
 
   private swapBrother() {
@@ -1954,7 +1991,7 @@ class MumuBrothersScene extends Phaser.Scene {
 
   private spawnWave() {
     this.clearCombat();
-    this.isPointerDown = false;
+    this.resetPointerFireInput();
     this.activeTouchMoves.clear();
     this.updateTouchMove();
     this.activeEvent = undefined;
@@ -2206,10 +2243,10 @@ class MumuBrothersScene extends Phaser.Scene {
   }
 
   private shoot() {
-    if (this.isGameOver || this.inShop || this.inFieldUpgrade || this.reloading || this.time.now < this.nextPlayerShot) return;
+    if (this.isGameOver || this.inShop || this.inFieldUpgrade || this.reloading || this.time.now < this.nextPlayerShot) return false;
     if (this.ammo <= 0) {
       this.startReload();
-      return;
+      return false;
     }
     const weapon = this.weaponStats();
     this.leaveCover();
@@ -2253,6 +2290,7 @@ class MumuBrothersScene extends Phaser.Scene {
     if (critical && hit) this.pop(this.reticle.x, this.reticle.y, "치명타!");
     if (this.ammo <= 0) this.time.delayedCall(90, () => this.startReload());
     this.updateHud();
+    return true;
   }
 
   private spawnBullet(
@@ -2992,7 +3030,7 @@ class MumuBrothersScene extends Phaser.Scene {
     this.inShop = true;
     this.workshopUpgradesPurchased = 0;
     this.workshopUpgradeKindsPurchased.clear();
-    this.isPointerDown = false;
+    this.resetPointerFireInput();
     this.activeTouchMoves.clear();
     this.updateTouchMove();
     this.coverIndicator.setVisible(false);
@@ -3923,7 +3961,7 @@ class MumuBrothersScene extends Phaser.Scene {
   private completeAct() {
     if (this.bossSpawned || this.actTransitioning || this.inFieldUpgrade) return;
     this.actTransitioning = true;
-    this.isPointerDown = false;
+    this.resetPointerFireInput();
     this.activeTouchMoves.clear();
     this.updateTouchMove();
     this.clearCombat();
